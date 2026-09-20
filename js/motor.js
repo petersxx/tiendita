@@ -103,6 +103,7 @@ p:last-child{margin-bottom:0}
 .sec-h p{color:${t.mudo};font-size:16px;margin:0}
 .eyebrow{display:inline-block;font-size:11.5px;letter-spacing:.2em;text-transform:uppercase;font-weight:600;color:${t.ac};margin-bottom:14px}
 .arte{background-color:${t.sup2}}
+.arte-auto{${arte(t,1)}}
 .btn{display:inline-block;background:${t.ac};color:${t.onAc};padding:14px 28px;border-radius:999px;
   text-decoration:none;font-weight:600;font-family:${t.txt};font-size:calc(15px*var(--esc));border:2px solid ${t.ac}}
 .btn:hover{background:${t.acFuerte};border-color:${t.acFuerte}}

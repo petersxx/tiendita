@@ -117,11 +117,23 @@ const SEC = {
         nuevo:{titulo:'Ítem nuevo',meta:'',texto:'',img:''},
         item:[{k:'titulo',l:'Título',t:'text'},{k:'meta',l:'Dato destacado (precio, medida, duración)',t:'text'},
               {k:'texto',l:'Descripción',t:'textarea'},{k:'img',l:'Imagen',t:'img'}]},
+
+      {k:'_notionDb',   g:'Catálogo desde Notion', l:'ID de la base de Notion', t:'text',
+        pista:'Está en la URL de la base: notion.so/…/<32 caracteres>?v=…'},
+      {k:'_notionVivo', g:'Catálogo desde Notion', l:'Leer Notion cada vez que alguien abre la página', t:'check',
+        pista:'Apagado: los productos quedan escritos en el HTML y la página no depende de nada.'},
+      {k:'_moneda',     g:'Catálogo desde Notion', l:'Prefijo del precio', t:'text',
+        pista:'Se usa sólo si en Notion el precio es un número. Si lo escribís como texto, se respeta tal cual.'},
+      {k:'_apiBase',    g:'Catálogo desde Notion', l:'Dirección de la API', t:'text',
+        pista:'El despliegue de Vercel que guarda las claves de Notion y R2.'},
+      {k:'_importar',   g:'Catálogo desde Notion', l:'', t:'accion',
+        texto:'Importar productos ahora', accion:'importarNotion',
+        pista:'Trae los productos de Notion y reemplaza la lista de arriba.'},
     ],
     html:(d,t,a)=>`
 <section class="sec" id="catalogo"><div class="wrap">
   <div class="sec-h"><h2${a.c('cardsTitulo')}>${esc(d.cardsTitulo)}</h2>${d.cardsIntro?`<p${a.c('cardsIntro')}>${esc(d.cardsIntro)}</p>`:''}</div>
-  <div class="rejilla ${esc(d._cardStyle||'grid')}">
+  <div class="rejilla ${esc(d._cardStyle||'grid')}" data-catalogo>
     ${(d.cards||[]).map((c,i)=>`
     <article class="tarj"${a.it(`cards.${i}`)}>
       ${media(c.img,t,i+1,'',a.im(`cards.${i}.img`))}
@@ -310,7 +322,11 @@ const CAMPOS_ESTILO = [
 ];
 
 /* valores de estilo que todo rubro hereda si no los define */
-const ESTILO_POR_DEFECTO = { _escala:1, _radio:14, _aire:1 };
+const ESTILO_POR_DEFECTO = {
+  _escala:1, _radio:14, _aire:1,
+  _notionDb:'', _notionVivo:false, _moneda:'Gs.',
+  _apiBase:'https://tiendita-ebon-one.vercel.app',
+};
 
 /* reúne los campos de un rubro a partir de sus secciones */
 function camposDe(tpl){
@@ -337,6 +353,43 @@ function capaEditorCss(){ return `
 [data-campo][contenteditable="true"]:empty::before{content:attr(data-vacio);opacity:.45}
 `; }
 
+/* ---------- catálogo leído de Notion en cada visita ----------
+   Los productos que ya están escritos en el HTML quedan como respaldo:
+   si Notion tarda o falla, la página igual muestra algo. */
+function guionCatalogo(d){
+  if(!(d._notionVivo && d._notionDb)) return '';
+  const api = String(d._apiBase || '').replace(/\/+$/,'');
+  if(!api) return '';
+  const url = api + '/api/catalogo?db=' + encodeURIComponent(String(d._notionDb).replace(/-/g,''))
+            + '&moneda=' + encodeURIComponent(d._moneda || '');
+  return `
+<script>
+(function(){
+  var cont = document.querySelector('[data-catalogo]');
+  if(!cont || !window.fetch) return;
+  function e(s){ return String(s == null ? '' : s).replace(/[&<>"]/g, function(c){
+    return { '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;' }[c];
+  }); }
+  function tarjeta(p){
+    var medio = p.img ? '<img src="' + e(p.img) + '" alt="" loading="lazy">'
+                      : '<div class="arte arte-auto"></div>';
+    return '<article class="tarj">' + medio + '<div class="cuerpo">'
+      + '<h3>' + e(p.titulo) + '</h3>'
+      + (p.meta  ? '<div class="meta">' + e(p.meta) + '</div>' : '')
+      + (p.texto ? '<p>' + e(p.texto) + '</p>' : '')
+      + '</div></article>';
+  }
+  fetch(${JSON.stringify(url)}, { headers: { Accept: 'application/json' } })
+    .then(function(r){ return r.ok ? r.json() : null; })
+    .then(function(d){
+      if(!d || !d.productos || !d.productos.length) return;  // se queda el respaldo
+      cont.innerHTML = d.productos.map(tarjeta).join('');
+    })
+    .catch(function(){});
+})();
+<\/script>`;
+}
+
 /* documento final: HTML autónomo, listo para subir a cualquier hosting */
 function renderDoc(tpl, d, editable){
   const t = tema(d);
@@ -361,6 +414,7 @@ function renderDoc(tpl, d, editable){
 </head>
 <body>
 ${cuerpo}
+${guionCatalogo(d)}
 </body>
 </html>`;
 }

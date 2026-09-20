@@ -204,6 +204,32 @@ button{font:inherit;color:inherit}
 }
 .color-row code{font-family:var(--mono);font-size:12px;color:var(--muted);text-transform:uppercase}
 
+/* campos de imagen */
+.img-caja{display:flex;gap:10px;align-items:center;margin-bottom:2px}
+.img-mini{width:54px;height:54px;flex:none;border-radius:8px;object-fit:cover;border:1px solid var(--line);background:var(--surface2)}
+.img-mini.vacia{display:grid;place-items:center;font-size:9px;line-height:1.2;text-align:center;color:var(--muted);
+  border-style:dashed;padding:4px}
+.img-acciones{display:flex;gap:6px;flex-wrap:wrap}
+.imgfld.encima{outline:2px dashed var(--accent);outline-offset:5px;border-radius:8px}
+.imgfld.subiendo{opacity:.55;pointer-events:none}
+.imgfld.subiendo .img-mini{animation:latir 1s ease-in-out infinite}
+@keyframes latir{50%{opacity:.4}}
+
+/* casilla y botón de acción */
+.fld label.check{display:flex;gap:9px;align-items:flex-start;cursor:pointer;font-size:13px;font-weight:500;color:var(--ink)}
+.fld label.check input{width:16px;height:16px;flex:none;margin:1px 0 0;accent-color:var(--accent);cursor:pointer}
+.btn.accion{width:100%;background:var(--accent-soft);border-color:var(--accent);color:var(--accent);font-size:13px}
+.btn.accion:hover{background:var(--accent);color:var(--accent-ink)}
+
+/* campo suelto en la barra lateral */
+.rail-campo{display:flex;flex-direction:column;gap:5px;padding:0 9px}
+.rail-campo span{font-size:11.5px;font-weight:600;color:var(--muted)}
+.rail-campo input{
+  width:100%;background:var(--surface2);border:1px solid var(--line);border-radius:8px;
+  padding:7px 9px;font:inherit;font-size:13px;color:var(--ink)
+}
+.rail-campo input:focus{outline:none;border-color:var(--accent);background:var(--surface)}
+
 .item{border:1px solid var(--line);border-radius:var(--r);background:var(--surface2);overflow:hidden}
 .item-h{display:flex;align-items:center;gap:4px;padding:6px 6px 6px 11px;border-bottom:1px solid var(--line)}
 .item-h b{flex:1;min-width:0;font-size:12.5px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}

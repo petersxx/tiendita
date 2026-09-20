@@ -55,6 +55,18 @@ function defCampo(ruta){
    PANEL DE CAMPOS
    ========================================================= */
 function idDe(ruta){ return 'f-' + ruta.replace(/\./g,'-'); }
+function pistaHTML(c){ return c.pista ? `<span class="hint">${esc(c.pista)}</span>` : ''; }
+
+function cajaImagen(ruta, v){
+  return `<div class="img-caja">
+    ${v ? `<img class="img-mini" src="${esc(v)}" alt="">`
+        : `<div class="img-mini vacia" aria-hidden="true">sin imagen</div>`}
+    <div class="img-acciones">
+      <button class="btn tiny" type="button" data-subir="${esc(ruta)}">Subir</button>
+      ${v ? `<button class="btn tiny" type="button" data-quitar-img="${esc(ruta)}">Quitar</button>` : ''}
+    </div>
+  </div>`;
+}
 
 function campoHTML(c, ruta, esCabecera){
   const v = obtener(D, ruta) ?? '';
@@ -78,10 +90,20 @@ function campoHTML(c, ruta, esCabecera){
         <select id="${id}" data-path="${esc(ruta)}">
         ${c.opts.map(o=>`<option value="${esc(o.v)}"${o.v===v?' selected':''}>${esc(o.l)}</option>`).join('')}
         </select></div>`;
+    case 'check':
+      return `<div class="fld" data-fld="${esc(ruta)}">
+        <label class="check"><input type="checkbox" id="${id}" data-path="${esc(ruta)}"${v?' checked':''}>
+        <span>${esc(c.l)}</span></label>${pistaHTML(c)}</div>`;
+    case 'accion':
+      return `<div class="fld" data-fld="${esc(ruta)}">
+        <button class="btn accion" type="button" data-accion="${esc(c.accion)}">${esc(c.texto)}</button>
+        ${pistaHTML(c)}</div>`;
     case 'img':
-      return `<div class="fld" data-fld="${esc(ruta)}"><label for="${id}">${esc(c.l)}</label>
-        <input type="text" id="${id}" data-path="${esc(ruta)}" value="${esc(v)}" placeholder="https://…">
-        <span class="hint">Vacío = fondo de color generado. La vista previa no carga imágenes externas, pero sí se ven en la página exportada.</span></div>`;
+      return `<div class="fld imgfld" data-fld="${esc(ruta)}" data-drop="${esc(ruta)}">
+        <label for="${id}">${esc(c.l)}</label>
+        ${cajaImagen(ruta, v)}
+        <input type="text" id="${id}" data-path="${esc(ruta)}" value="${esc(v)}" placeholder="https://… o arrastrá un archivo acá">
+        <span class="hint">Arrastrá una imagen sobre este campo o tocá <b>Subir</b>: va a tu bucket R2. Vacío = fondo generado.</span></div>`;
     case 'lista':
       return listaHTML(c, ruta);
     default:
@@ -135,6 +157,8 @@ panel.addEventListener('input', e=>{
   if(!ruta) return;
   const def = defCampo(ruta);
 
+  if(el.type === 'checkbox'){ fijar(D, ruta, el.checked); tocar(); return; }
+
   if(el.type === 'range'){
     const num = Number(el.value);
     fijar(D, ruta, num);
@@ -175,9 +199,40 @@ panel.addEventListener('focusin', e=>{
 });
 
 panel.addEventListener('click', e=>{
+  const subir = e.target.closest('[data-subir]');
+  if(subir){ pedirArchivo(subir.dataset.subir); return; }
+
+  const quitar = e.target.closest('[data-quitar-img]');
+  if(quitar){
+    fijar(D, quitar.dataset.quitarImg, '');
+    refrescarCampoImagen(quitar.dataset.quitarImg);
+    tocar(); aviso('Vuelve el fondo generado'); return;
+  }
+
+  const accion = e.target.closest('[data-accion]');
+  if(accion){ if(accion.dataset.accion === 'importarNotion') importarNotion(); return; }
+
   const b = e.target.closest('button[data-act]');
   if(!b) return;
   accionLista(b.dataset.key, b.dataset.act, Number(b.dataset.i));
+});
+
+/* ---------- arrastrar y soltar una imagen sobre su campo ---------- */
+panel.addEventListener('dragover', e=>{
+  const f = e.target.closest && e.target.closest('[data-drop]');
+  if(!f) return;
+  e.preventDefault(); f.classList.add('encima');
+});
+panel.addEventListener('dragleave', e=>{
+  const f = e.target.closest && e.target.closest('[data-drop]');
+  if(f) f.classList.remove('encima');
+});
+panel.addEventListener('drop', e=>{
+  const f = e.target.closest && e.target.closest('[data-drop]');
+  if(!f) return;
+  e.preventDefault(); f.classList.remove('encima');
+  const archivo = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+  if(archivo) subirImagen(archivo, f.dataset.drop);
 });
 
 function accionLista(ruta, acto, i){
@@ -342,8 +397,13 @@ function mostrarBarra(el){
   if(!item && !esImg){ ocultarBarra(); return; }
   barra.hidden = false;
   barra.style.visibility = 'visible';
+  const deImagen = new Set(['img','imgq']);
   barra.querySelectorAll('[data-bact]').forEach(b=>{
-    b.hidden = b.dataset.bact === 'img' ? !esImg : !item;
+    if(deImagen.has(b.dataset.bact)){
+      b.hidden = !esImg || (b.dataset.bact === 'imgq' && !obtener(D, el.dataset.campoImg));
+    } else {
+      b.hidden = !item;
+    }
   });
   colocarBarra();
 }
@@ -375,11 +435,12 @@ function colocarBarra(){
 barra.addEventListener('click', e=>{
   const b = e.target.closest('[data-bact]'); if(!b) return;
   const acto = b.dataset.bact;
-  if(acto === 'img'){
-    const ruta = seleccion;
-    if(obtener(D, ruta)){ fijar(D, ruta, ''); aviso('Imagen quitada: vuelve el fondo generado'); }
-    else { resaltarCampoPanel(ruta); const i = panel.querySelector(`[data-path="${ruta}"]`); if(i) i.focus(); return; }
-    pintarVista(); apuntarGuardado(); return;
+  if(acto === 'img'){ pedirArchivo(seleccion); return; }
+  if(acto === 'imgq'){
+    fijar(D, seleccion, '');
+    refrescarCampoImagen(seleccion);
+    pintarVista(); apuntarGuardado();
+    aviso('Vuelve el fondo generado'); return;
   }
   if(!itemActual) return;
   const p = itemActual.lastIndexOf('.');
@@ -642,6 +703,108 @@ function irA(tab){
   aplicarZoom();
 }
 document.querySelectorAll('.tabbar button').forEach(b=> b.addEventListener('click', ()=>irA(b.dataset.tab)));
+
+/* =========================================================
+   IMÁGENES EN R2 Y CATÁLOGO EN NOTION
+   El navegador nunca ve las claves: le pide a /api/subir una URL
+   firmada y manda el archivo derecho a Cloudflare.
+   ========================================================= */
+const CLAVE_SUBIDA = 'taller.claveSubida';
+const inputArchivo = $('#archivo-img');
+let rutaSubida = null;
+
+function apiBase(){ return String(D._apiBase || '').replace(/\/+$/, ''); }
+function pedirArchivo(ruta){ rutaSubida = ruta; inputArchivo.click(); }
+
+inputArchivo.addEventListener('change', ()=>{
+  const archivo = inputArchivo.files && inputArchivo.files[0];
+  inputArchivo.value = '';
+  if(archivo && rutaSubida) subirImagen(archivo, rutaSubida);
+});
+
+function refrescarCampoImagen(ruta){
+  const fld = panel.querySelector(`[data-fld="${ruta}"]`);
+  if(!fld) return;
+  const v = obtener(D, ruta) || '';
+  const inp = fld.querySelector('input[type=text]');
+  if(inp) inp.value = v;
+  const caja = fld.querySelector('.img-caja');
+  if(caja) caja.outerHTML = cajaImagen(ruta, v);
+}
+
+async function subirImagen(archivo, ruta){
+  const base = apiBase();
+  if(!base){ aviso('Falta la dirección de la API, en «Catálogo desde Notion».'); return; }
+  if(!/^image\//.test(archivo.type)){ aviso('Eso no es una imagen.'); return; }
+  if(archivo.size > 10 * 1024 * 1024){ aviso('La imagen pasa de 10 MB. Achicala antes.'); return; }
+
+  const fld = panel.querySelector(`[data-fld="${ruta}"]`);
+  if(fld) fld.classList.add('subiendo');
+  aviso('Subiendo ' + archivo.name + '…');
+
+  try{
+    const clave = leerLocal(CLAVE_SUBIDA, '') || '';
+    const cab = { 'Content-Type':'application/json' };
+    if(clave) cab['x-subida-token'] = clave;
+
+    const permiso = await fetch(base + '/api/subir', {
+      method:'POST', headers:cab,
+      body: JSON.stringify({ nombre:archivo.name, tipo:archivo.type, tamano:archivo.size })
+    });
+    const datos = await permiso.json().catch(()=>({}));
+    if(!permiso.ok) throw new Error(datos.error || 'La API no autorizó la subida.');
+
+    const puesta = await fetch(datos.urlSubida, {
+      method:'PUT', headers:{ 'Content-Type':archivo.type }, body:archivo
+    });
+    if(!puesta.ok) throw new Error('R2 rechazó el archivo. Revisá la regla CORS del bucket.');
+
+    fijar(D, ruta, datos.urlPublica);
+    refrescarCampoImagen(ruta);
+    pintarVista();
+    apuntarGuardado();
+    aviso('Imagen subida');
+  }catch(err){
+    aviso(String(err.message || err));
+  }finally{
+    const f2 = panel.querySelector(`[data-fld="${ruta}"]`);
+    if(f2) f2.classList.remove('subiendo');
+  }
+}
+
+async function importarNotion(){
+  const base = apiBase();
+  const db = String(D._notionDb || '').trim().replace(/-/g, '');
+  if(!base){ aviso('Falta la dirección de la API.'); return; }
+  if(!/^[0-9a-f]{32}$/i.test(db)){ aviso('El ID de la base de Notion tiene que ser de 32 caracteres.'); return; }
+
+  aviso('Consultando Notion…');
+  try{
+    const r = await fetch(`${base}/api/catalogo?db=${encodeURIComponent(db)}&moneda=${encodeURIComponent(D._moneda || '')}`);
+    const j = await r.json().catch(()=>({}));
+    if(!r.ok) throw new Error(j.error || 'Notion no respondió.');
+    if(!j.productos || !j.productos.length) throw new Error('La base no devolvió productos visibles.');
+
+    D.cards = j.productos.map(p => ({
+      titulo: p.titulo || '', meta: p.meta || '', texto: p.texto || '', img: p.img || ''
+    }));
+    limpiarSeleccion();
+    pintarPanel(); pintarVista(); apuntarGuardado();
+    aviso(`Importados ${j.productos.length} productos de Notion`);
+  }catch(err){
+    aviso(String(err.message || err));
+  }
+}
+
+/* clave opcional de subida: vive sólo en este navegador, nunca se exporta */
+const inputClave = $('#clave-subida');
+if(inputClave){
+  inputClave.value = leerLocal(CLAVE_SUBIDA, '') || '';
+  inputClave.addEventListener('change', ()=>{
+    escribirLocal(CLAVE_SUBIDA, inputClave.value.trim());
+    aviso(inputClave.value.trim() ? 'Clave de subida guardada en este navegador' : 'Clave de subida borrada');
+  });
+}
 
 /* ---------- arranque ---------- */
 irA('vista');
