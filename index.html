@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Taller de Páginas</title>
+<meta name="description" content="Editor de plantillas por rubro para armar y exportar páginas web completas. Contenido de arranque pensado para negocios paraguayos.">
+<meta name="theme-color" content="#0E6F60" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0C1311" media="(prefers-color-scheme: dark)">
+<meta property="og:title" content="Taller de Páginas">
+<meta property="og:description" content="Elegí tu rubro, editá los textos y descargá tu página web lista para subir.">
+<meta property="og:type" content="website">
+<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2032%2032%22%3E%3Crect%20width%3D%2232%22%20height%3D%2232%22%20rx%3D%227%22%20fill%3D%22%230E6F60%22%2F%3E%3Cg%20fill%3D%22%23fff%22%3E%3Crect%20x%3D%227%22%20y%3D%228%22%20width%3D%2218%22%20height%3D%223.4%22%20rx%3D%221.7%22%2F%3E%3Crect%20x%3D%227%22%20y%3D%2214.3%22%20width%3D%2218%22%20height%3D%223.4%22%20rx%3D%221.7%22%2F%3E%3Crect%20x%3D%227%22%20y%3D%2220.6%22%20width%3D%2218%22%20height%3D%223.4%22%20rx%3D%221.7%22%2F%3E%3C%2Fg%3E%3C%2Fsvg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Manrope:wght@400;500;600;700&family=Syne:wght@700;800&display=swap">
+<style>
+  /* Base que el visor de Artifacts aportaba; acá la declaramos nosotros. */
+  :root{
+    color-scheme: light dark;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  img{ max-width: 100%; }
+  [hidden]{ display: none !important; }
+</style>
+<script>
+  /* Antes de pintar: respeta el tema elegido la vez anterior. */
+  try{ var _t = localStorage.getItem('taller.tema');
+       if(_t) document.documentElement.dataset.theme = JSON.parse(_t); }catch(e){}
+</script>
+<link rel="stylesheet" href="css/taller.css">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="logo"><span class="glyph"></span><span>Taller de Páginas</span></div>
+  <input id="proj-name" class="proj-name" type="text" value="Mi página sin título" aria-label="Nombre del proyecto">
+  <div class="top-actions">
+    <button class="btn ghost" id="btn-tema" type="button" title="Claro u oscuro" aria-label="Cambiar entre tema claro y oscuro">◐</button>
+    <button class="btn" id="btn-save" type="button">Guardar</button>
+    <button class="btn" id="btn-code" type="button"><span class="label">Ver </span>HTML</button>
+    <button class="btn primary" id="btn-export" type="button">Exportar</button>
+  </div>
+</header>
+
+<div class="workbench">
+  <aside class="pane rail">
+    <div class="rail-h">Rubros <span id="rubro-count" style="font-family:var(--mono);font-size:10px"></span></div>
+    <div class="tpl-list" id="tpl-list"></div>
+    <div class="rail-h">Mis proyectos <button class="btn ghost tiny" id="btn-new" type="button">+ Nuevo</button></div>
+    <div id="proj-list"></div>
+    <div class="rail-h" style="margin-top:22px">Dónde se guarda</div>
+    <p class="empty" id="store-note">Comprobando…</p>
+  </aside>
+
+  <section class="pane stage">
+    <div class="stage-bar">
+      <div class="seg" role="group" aria-label="Ancho de pantalla">
+        <button type="button" data-device="escritorio" aria-pressed="true">Escritorio</button>
+        <button type="button" data-device="tablet" aria-pressed="false">Tablet</button>
+        <button type="button" data-device="movil" aria-pressed="false">Móvil</button>
+      </div>
+      <span class="dims" id="dims">100%</span>
+    </div>
+    <div class="canvas" id="canvas" data-device="escritorio">
+      <div class="frame"><iframe id="preview" title="Vista previa de la página"></iframe></div>
+    </div>
+  </section>
+
+  <aside class="pane panel" id="panel"></aside>
+</div>
+
+<nav class="tabbar" role="group" aria-label="Secciones">
+  <button type="button" data-tab="plantillas" aria-pressed="false">Plantillas</button>
+  <button type="button" data-tab="editar" aria-pressed="false">Editar</button>
+  <button type="button" data-tab="vista" aria-pressed="true">Vista</button>
+</nav>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script src="js/motor.js"></script>
+<script src="js/secciones.js"></script>
+<script src="js/rubros.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
