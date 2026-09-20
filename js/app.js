@@ -710,6 +710,18 @@ document.querySelectorAll('.tabbar button').forEach(b=> b.addEventListener('clic
    firmada y manda el archivo derecho a Cloudflare.
    ========================================================= */
 const CLAVE_SUBIDA = 'taller.claveSubida';
+/* Dentro del visor de Artifacts de Claude la CSP bloquea cualquier fetch
+   externo, así que subir a R2 o consultar Notion no puede funcionar ahí. */
+const EN_VISOR = !!(window.claude && window.claude.use);
+
+function explicarFalloDeRed(err){
+  if(err instanceof TypeError){
+    return EN_VISOR
+      ? 'El visor de Claude bloquea las conexiones externas. Esto funciona en el sitio publicado.'
+      : 'No se pudo conectar con la API. Revisá la dirección en «Catálogo desde Notion».';
+  }
+  return String(err.message || err);
+}
 const inputArchivo = $('#archivo-img');
 let rutaSubida = null;
 
@@ -765,7 +777,7 @@ async function subirImagen(archivo, ruta){
     apuntarGuardado();
     aviso('Imagen subida');
   }catch(err){
-    aviso(String(err.message || err));
+    aviso(explicarFalloDeRed(err));
   }finally{
     const f2 = panel.querySelector(`[data-fld="${ruta}"]`);
     if(f2) f2.classList.remove('subiendo');
@@ -792,8 +804,17 @@ async function importarNotion(){
     pintarPanel(); pintarVista(); apuntarGuardado();
     aviso(`Importados ${j.productos.length} productos de Notion`);
   }catch(err){
-    aviso(String(err.message || err));
+    aviso(explicarFalloDeRed(err));
   }
+}
+
+if(EN_VISOR){
+  const nota = document.createElement('p');
+  nota.className = 'empty';
+  nota.innerHTML = 'Estás en el visor de Claude, que bloquea las conexiones externas: '
+    + 'subir imágenes e importar de Notion funcionan en el <b>sitio publicado</b>.';
+  const ancla = $('#clave-subida');
+  if(ancla) ancla.closest('.rail-campo').before(nota);
 }
 
 /* clave opcional de subida: vive sólo en este navegador, nunca se exporta */
