@@ -4,11 +4,21 @@
 const $ = s => document.querySelector(s);
 const panel = $('#panel'), preview = $('#preview'), inpNombre = $('#proj-name');
 const listaTpl = $('#tpl-list'), listaProj = $('#proj-list'), notaAlmacen = $('#store-note');
+const canvas = $('#canvas'), marco = $('#marco'), envoltorio = $('#marco-wrap'), barra = $('#barra-lienzo');
 
 let TPL = RUBROS[0];
 let D = clonar(TPL.d);
 let proyectoId = null;
 let cap = { db:null, downloads:null };
+
+let modo = 'editar';              // 'editar' escribe sobre la página · 'ver' la usa como el visitante
+let dispositivo = 'escritorio';
+let zoom = 1, zoomAuto = true;
+let seleccion = null;             // ruta del campo seleccionado en la página
+let itemActual = null;            // ítem repetible que lo contiene, ej. "cards.2"
+let tPrev, tGuard;
+
+const ANCHOS = { escritorio:1280, tablet:820, movil:390 };
 
 function clonar(o){ return JSON.parse(JSON.stringify(o)); }
 function aviso(txt){
@@ -29,8 +39,16 @@ function fijar(obj, ruta, valor){
   for(let i=0;i<seg.length-1;i++) cur = cur[seg[i]];
   cur[seg[seg.length-1]] = valor;
 }
-function obtener(obj, ruta){
-  return ruta.split('.').reduce((o,k)=> (o==null?o:o[k]), obj);
+function obtener(obj, ruta){ return ruta.split('.').reduce((o,k)=> (o==null?o:o[k]), obj); }
+
+function camposVisibles(){
+  return camposDe(TPL).filter(c => c.k !== '_cardStyle' || TPL.secciones.includes('cards'));
+}
+function defCampo(ruta){
+  const seg = ruta.split('.');
+  const c = camposVisibles().find(x => x.k === seg[0]);
+  if(!c) return null;
+  return (c.t === 'lista' && seg[2]) ? c.item.find(x => x.k === seg[2]) : c;
 }
 
 /* =========================================================
@@ -44,25 +62,30 @@ function campoHTML(c, ruta, esCabecera){
   const head = esCabecera ? ' data-head="1"' : '';
   switch(c.t){
     case 'textarea':
-      return `<div class="fld"><label for="${id}">${esc(c.l)}</label>
+      return `<div class="fld" data-fld="${esc(ruta)}"><label for="${id}">${esc(c.l)}</label>
         <textarea id="${id}" data-path="${esc(ruta)}"${head}>${esc(v)}</textarea></div>`;
     case 'color':
-      return `<div class="fld"><label for="${id}">${esc(c.l)}</label>
+      return `<div class="fld" data-fld="${esc(ruta)}"><label for="${id}">${esc(c.l)}</label>
         <div class="color-row"><input type="color" id="${id}" data-path="${esc(ruta)}" value="${esc(v)}">
         <code data-eco="${esc(ruta)}">${esc(v)}</code></div></div>`;
+    case 'rango':
+      return `<div class="fld" data-fld="${esc(ruta)}">
+        <label for="${id}">${esc(c.l)} <b class="eco" data-eco="${esc(ruta)}">${esc(c.formato ? c.formato(Number(v)) : v)}</b></label>
+        <input type="range" id="${id}" data-path="${esc(ruta)}" data-vivo="${esc(c.vivo||'')}" data-unidad="${esc(c.unidad||'')}"
+          min="${c.min}" max="${c.max}" step="${c.paso}" value="${esc(v)}"></div>`;
     case 'select':
-      return `<div class="fld"><label for="${id}">${esc(c.l)}</label>
+      return `<div class="fld" data-fld="${esc(ruta)}"><label for="${id}">${esc(c.l)}</label>
         <select id="${id}" data-path="${esc(ruta)}">
         ${c.opts.map(o=>`<option value="${esc(o.v)}"${o.v===v?' selected':''}>${esc(o.l)}</option>`).join('')}
         </select></div>`;
     case 'img':
-      return `<div class="fld"><label for="${id}">${esc(c.l)}</label>
+      return `<div class="fld" data-fld="${esc(ruta)}"><label for="${id}">${esc(c.l)}</label>
         <input type="text" id="${id}" data-path="${esc(ruta)}" value="${esc(v)}" placeholder="https://…">
-        <span class="hint">Vacío = se dibuja un fondo de color. La vista previa no carga imágenes externas, pero sí se ven en la página exportada.</span></div>`;
+        <span class="hint">Vacío = fondo de color generado. La vista previa no carga imágenes externas, pero sí se ven en la página exportada.</span></div>`;
     case 'lista':
       return listaHTML(c, ruta);
     default:
-      return `<div class="fld"><label for="${id}">${esc(c.l)}</label>
+      return `<div class="fld" data-fld="${esc(ruta)}"><label for="${id}">${esc(c.l)}</label>
         <input type="text" id="${id}" data-path="${esc(ruta)}" value="${esc(v)}"${head}></div>`;
   }
 }
@@ -77,23 +100,19 @@ function listaHTML(c, ruta){
 
 function itemHTML(c, ruta, i){
   const it = obtener(D, ruta)[i] || {};
-  const primero = c.item[0].k;
-  const rotulo = String(it[primero] || '').trim() || `Ítem ${i+1}`;
+  const rotulo = String(it[c.item[0].k] || '').trim() || `Ítem ${i+1}`;
   return `<div class="item" data-i="${i}">
     <div class="item-h">
       <b>${esc(rotulo)}</b>
       <button type="button" data-act="up"   data-key="${esc(ruta)}" data-i="${i}" title="Subir" aria-label="Subir">↑</button>
       <button type="button" data-act="down" data-key="${esc(ruta)}" data-i="${i}" title="Bajar" aria-label="Bajar">↓</button>
+      <button type="button" data-act="dup"  data-key="${esc(ruta)}" data-i="${i}" title="Duplicar" aria-label="Duplicar">⧉</button>
       <button type="button" class="rm" data-act="rm" data-key="${esc(ruta)}" data-i="${i}" title="Quitar" aria-label="Quitar">✕</button>
     </div>
     <div class="item-b">
       ${c.item.map((sc,j)=> campoHTML(sc, `${ruta}.${i}.${sc.k}`, j===0)).join('')}
     </div>
   </div>`;
-}
-
-function camposVisibles(){
-  return camposDe(TPL).filter(c => c.k !== '_cardStyle' || TPL.secciones.includes('cards'));
 }
 
 function pintarPanel(){
@@ -110,11 +129,26 @@ function pintarPanel(){
     </details>`).join('');
 }
 
+/* ---------- el panel escribe en los datos ---------- */
 panel.addEventListener('input', e=>{
   const el = e.target, ruta = el.dataset.path;
   if(!ruta) return;
+  const def = defCampo(ruta);
+
+  if(el.type === 'range'){
+    const num = Number(el.value);
+    fijar(D, ruta, num);
+    const eco = panel.querySelector(`[data-eco="${ruta}"]`);
+    if(eco) eco.textContent = def && def.formato ? def.formato(num) : num;
+    // las variables vivas se aplican al instante, sin rehacer la página
+    const doc = docVista();
+    if(doc && el.dataset.vivo) doc.documentElement.style.setProperty(el.dataset.vivo, num + (el.dataset.unidad||''));
+    apuntarGuardado();
+    return;
+  }
+
   fijar(D, ruta, el.value);
-  const eco = panel.querySelector(`[data-eco="${CSS.escape(ruta)}"]`);
+  const eco = panel.querySelector(`[data-eco="${ruta}"]`);
   if(eco) eco.textContent = el.value;
   if(el.dataset.head){
     const item = el.closest('.item');
@@ -123,37 +157,281 @@ panel.addEventListener('input', e=>{
   tocar();
 });
 
+/* ---------- el panel enfoca lo que corresponde en la página ---------- */
+panel.addEventListener('focusin', e=>{
+  const ruta = e.target.dataset && e.target.dataset.path;
+  if(!ruta || modo !== 'editar') return;
+  const doc = docVista(); if(!doc) return;
+  const el = doc.querySelector(`[data-campo="${ruta}"]`) || doc.querySelector(`[data-campo-img="${ruta}"]`);
+  panel.querySelectorAll('.fld.activo').forEach(x=>x.classList.remove('activo'));
+  const fld = e.target.closest('.fld'); if(fld) fld.classList.add('activo');
+  if(!el) { ocultarBarra(); return; }
+  doc.querySelectorAll('.tp-sel').forEach(x=>x.classList.remove('tp-sel'));
+  el.classList.add('tp-sel');
+  seleccion = ruta;
+  const w = doc.defaultView, r = el.getBoundingClientRect();
+  if(w) w.scrollTo({ top: w.scrollY + r.top - (w.innerHeight - r.height)/2, behavior:'smooth' });
+  mostrarBarra(el);
+});
+
 panel.addEventListener('click', e=>{
   const b = e.target.closest('button[data-act]');
   if(!b) return;
-  const ruta = b.dataset.key, acto = b.dataset.act;
+  accionLista(b.dataset.key, b.dataset.act, Number(b.dataset.i));
+});
+
+function accionLista(ruta, acto, i){
   const c = camposVisibles().find(x=>x.k===ruta.split('.')[0]);
   const arr = obtener(D, ruta);
-  const i = Number(b.dataset.i);
   if(acto==='add')  arr.push(clonar(c.nuevo));
+  if(acto==='dup')  arr.splice(i+1,0,clonar(arr[i]));
   if(acto==='rm')   arr.splice(i,1);
   if(acto==='up'   && i>0)            arr.splice(i-1,0,arr.splice(i,1)[0]);
   if(acto==='down' && i<arr.length-1) arr.splice(i+1,0,arr.splice(i,1)[0]);
-  const cont = panel.querySelector(`[data-list="${CSS.escape(ruta)}"]`);
+  const cont = panel.querySelector(`[data-list="${ruta}"]`);
   if(cont) cont.innerHTML = arr.map((_,k)=>itemHTML(c,ruta,k)).join('');
+  limpiarSeleccion();
   tocar();
-});
+}
 
 /* =========================================================
-   VISTA PREVIA
+   VISTA PREVIA Y EDICIÓN DIRECTA SOBRE LA PÁGINA
    ========================================================= */
-let tPrev, tGuard;
-function tocar(){
-  clearTimeout(tPrev); tPrev = setTimeout(pintarVista, 200);
+function docVista(){ try{ return preview.contentDocument; }catch(e){ return null; } }
+
+function apuntarGuardado(){
   guardarBorrador();
   if(proyectoId){ clearTimeout(tGuard); tGuard = setTimeout(()=>guardar(true), 1400); }
 }
+function tocar(){
+  clearTimeout(tPrev); tPrev = setTimeout(pintarVista, 200);
+  apuntarGuardado();
+}
+
 function pintarVista(){
   let y = 0;
   try{ y = preview.contentWindow.scrollY || 0; }catch(e){}
-  preview.onload = ()=>{ try{ preview.contentWindow.scrollTo(0,y); }catch(e){} };
-  preview.srcdoc = renderDoc(TPL, D);
+  preview.onload = ()=>{
+    try{ preview.contentWindow.scrollTo(0,y); }catch(e){}
+    conectarLienzo();
+    if(seleccion) restaurarSeleccion();
+  };
+  preview.srcdoc = renderDoc(TPL, D, modo === 'editar');
 }
+
+/* campos cuyo cambio afecta a otras partes de la página (enlaces, agrupaciones) */
+const REHACER = /^(marca|whatsapp|telefono|email|mapaUrl|instagram|ciudad|heroCtaUrl)$|\.seccion$|^navLinks\.\d+\.url$/;
+
+function conectarLienzo(){
+  const doc = docVista(); if(!doc || modo !== 'editar') return;
+
+  // habilitar la escritura en el mismo mousedown deja el cursor donde se hizo clic
+  doc.addEventListener('mousedown', ev=>{
+    const el = ev.target.closest && ev.target.closest('[data-campo]');
+    if(el && el.contentEditable !== 'true'){ el.contentEditable = 'true'; el.spellcheck = false; }
+  }, true);
+
+  doc.addEventListener('click', ev=>{
+    const enlace = ev.target.closest && ev.target.closest('a');
+    const resumen = ev.target.closest && ev.target.closest('summary');
+    if(enlace || resumen) ev.preventDefault();      // en edición nada navega ni se despliega
+    const txt = ev.target.closest && ev.target.closest('[data-campo]');
+    const img = ev.target.closest && ev.target.closest('[data-campo-img]');
+    if(txt){ elegir(txt, txt.dataset.campo); return; }
+    if(img){ elegir(img, img.dataset.campoImg); return; }
+    limpiarSeleccion();
+  }, true);
+
+  doc.addEventListener('input', ev=>{
+    const el = ev.target.closest && ev.target.closest('[data-campo]');
+    if(!el) return;
+    const ruta = el.dataset.campo;
+    const crudo = el.innerText.replace(/ /g,' ');
+    const valor = el.dataset.multi
+      ? crudo.replace(/\n{3,}/g,'\n\n').replace(/[ \t]+\n/g,'\n').trim()
+      : crudo.replace(/\s*\n+\s*/g,' ').trim();
+    fijar(D, ruta, valor);
+    sincronizarPanel(ruta, valor);
+    gemelos(ruta, valor, el);
+    apuntarGuardado();
+    // no repintamos: lo que se escribe ya está en pantalla
+  }, true);
+
+  doc.addEventListener('keydown', ev=>{
+    const el = ev.target.closest && ev.target.closest('[data-campo]');
+    if(!el) return;
+    if(ev.key === 'Escape'){ ev.preventDefault(); el.blur(); limpiarSeleccion(); }
+    if(ev.key === 'Enter' && !el.dataset.multi){ ev.preventDefault(); el.blur(); }
+  }, true);
+
+  doc.addEventListener('blur', ev=>{
+    const el = ev.target.closest && ev.target.closest('[data-campo]');
+    if(!el) return;
+    el.contentEditable = 'false';
+    if(REHACER.test(el.dataset.campo)){ clearTimeout(tPrev); tPrev = setTimeout(pintarVista, 120); }
+  }, true);
+
+  const w = doc.defaultView;
+  if(w) w.addEventListener('scroll', colocarBarra, {passive:true});
+}
+
+function elegir(el, ruta){
+  const doc = docVista(); if(!doc) return;
+  doc.querySelectorAll('.tp-sel').forEach(x=>x.classList.remove('tp-sel'));
+  el.classList.add('tp-sel');
+  seleccion = ruta;
+  resaltarCampoPanel(ruta);
+  mostrarBarra(el);
+}
+
+function limpiarSeleccion(){
+  const doc = docVista();
+  if(doc) doc.querySelectorAll('.tp-sel').forEach(x=>x.classList.remove('tp-sel'));
+  panel.querySelectorAll('.fld.activo').forEach(x=>x.classList.remove('activo'));
+  seleccion = null; ocultarBarra();
+}
+
+function restaurarSeleccion(){
+  const doc = docVista(); if(!doc || !seleccion) return;
+  const el = doc.querySelector(`[data-campo="${seleccion}"]`) || doc.querySelector(`[data-campo-img="${seleccion}"]`);
+  if(!el){ seleccion = null; ocultarBarra(); return; }
+  el.classList.add('tp-sel');
+  mostrarBarra(el);
+}
+
+/* mismo dato mostrado en dos lugares (la marca sale en la barra y en el pie) */
+function gemelos(ruta, valor, origen){
+  const doc = docVista(); if(!doc) return;
+  doc.querySelectorAll(`[data-campo="${ruta}"]`).forEach(el=>{
+    if(el !== origen && el.innerText !== valor) el.textContent = valor;
+  });
+}
+
+function sincronizarPanel(ruta, valor){
+  const inp = panel.querySelector(`[data-path="${ruta}"]`);
+  if(inp && inp.value !== valor) inp.value = valor;
+  if(inp && inp.dataset.head){
+    const item = inp.closest('.item');
+    if(item) item.querySelector('.item-h b').textContent = valor.trim() || 'Sin título';
+  }
+}
+
+function resaltarCampoPanel(ruta){
+  const inp = panel.querySelector(`[data-path="${ruta}"]`);
+  panel.querySelectorAll('.fld.activo').forEach(x=>x.classList.remove('activo'));
+  if(!inp) return;
+  const det = inp.closest('details'); if(det && !det.open) det.open = true;
+  const fld = inp.closest('.fld');
+  if(!fld) return;
+  fld.classList.add('activo');
+  // el cálculo a mano es fiable dentro de un contenedor con su propio scroll;
+  // esperamos un cuadro por si acabamos de abrir el grupo
+  requestAnimationFrame(()=>{
+    const rp = panel.getBoundingClientRect(), rf = fld.getBoundingClientRect();
+    if(rf.top < rp.top + 8 || rf.bottom > rp.bottom - 8){
+      panel.scrollTo({ top: panel.scrollTop + (rf.top - rp.top) - (rp.height - rf.height)/2, behavior:'smooth' });
+    }
+  });
+}
+
+/* ---------- barra flotante del ítem seleccionado ---------- */
+function mostrarBarra(el){
+  const item = el.closest('[data-item]');
+  const esImg = !!el.dataset.campoImg;
+  itemActual = item ? item.dataset.item : null;
+  if(!item && !esImg){ ocultarBarra(); return; }
+  barra.hidden = false;
+  barra.style.visibility = 'visible';
+  barra.querySelectorAll('[data-bact]').forEach(b=>{
+    b.hidden = b.dataset.bact === 'img' ? !esImg : !item;
+  });
+  colocarBarra();
+}
+function ocultarBarra(){ barra.hidden = true; itemActual = null; }
+
+function colocarBarra(){
+  if(barra.hidden) return;
+  const doc = docVista(); if(!doc){ ocultarBarra(); return; }
+  const el = doc.querySelector('.tp-sel'); if(!el){ ocultarBarra(); return; }
+  const rc = canvas.getBoundingClientRect();
+  const rm = marco.getBoundingClientRect();
+  const re = el.getBoundingClientRect();
+  const x  = rm.left + re.left * zoom;
+  const y  = rm.top  + re.top  * zoom;
+  const alto = re.height * zoom;
+
+  // si el elemento se fue del área visible del lienzo, la barra se esconde
+  if(y > rc.bottom - 6 || y + alto < rc.top + 6){ barra.style.visibility = 'hidden'; return; }
+  barra.style.visibility = 'visible';
+
+  const h = barra.offsetHeight || 30, w = barra.offsetWidth || 170;
+  // arriba del elemento; si no entra, se pasa abajo
+  const arriba = y - h - 8;
+  const top = arriba < rc.top + 4 ? y + alto + 8 : arriba;
+  barra.style.left = Math.round(Math.max(rc.left + 4, Math.min(rc.right - w - 4, x))) + 'px';
+  barra.style.top  = Math.round(Math.max(rc.top + 4, Math.min(rc.bottom - h - 4, top))) + 'px';
+}
+
+barra.addEventListener('click', e=>{
+  const b = e.target.closest('[data-bact]'); if(!b) return;
+  const acto = b.dataset.bact;
+  if(acto === 'img'){
+    const ruta = seleccion;
+    if(obtener(D, ruta)){ fijar(D, ruta, ''); aviso('Imagen quitada: vuelve el fondo generado'); }
+    else { resaltarCampoPanel(ruta); const i = panel.querySelector(`[data-path="${ruta}"]`); if(i) i.focus(); return; }
+    pintarVista(); apuntarGuardado(); return;
+  }
+  if(!itemActual) return;
+  const p = itemActual.lastIndexOf('.');
+  accionLista(itemActual.slice(0,p), acto, Number(itemActual.slice(p+1)));
+  pintarPanel(); pintarVista();
+});
+
+/* =========================================================
+   ZOOM Y TAMAÑO DE PANTALLA
+   ========================================================= */
+function aplicarZoom(){
+  const W = ANCHOS[dispositivo];
+  const cw = Math.max(240, canvas.clientWidth - 36);
+  const ch = Math.max(360, canvas.clientHeight - 36);
+  if(zoomAuto) zoom = Math.min(1, cw / W);
+  zoom = Math.min(1.5, Math.max(0.25, zoom));
+  const H = Math.max(520, Math.round(ch / zoom));
+  marco.style.width = W + 'px';
+  marco.style.height = H + 'px';
+  marco.style.transform = `scale(${zoom})`;
+  envoltorio.style.width = Math.round(W * zoom) + 'px';
+  envoltorio.style.height = Math.round(H * zoom) + 'px';
+  $('#zoom-val').textContent = Math.round(zoom * 100) + '%';
+  $('#dims').textContent = W + ' px de ancho';
+  colocarBarra();
+}
+function fijarZoom(z, auto){ zoomAuto = !!auto; if(!auto) zoom = z; aplicarZoom(); }
+
+$('#zoom-menos').addEventListener('click', ()=> fijarZoom(Math.round((zoom - .1)*100)/100, false));
+$('#zoom-mas').addEventListener('click',   ()=> fijarZoom(Math.round((zoom + .1)*100)/100, false));
+$('#zoom-ajustar').addEventListener('click', ()=> fijarZoom(0, true));
+addEventListener('resize', ()=>{ aplicarZoom(); });
+canvas.addEventListener('scroll', colocarBarra, {passive:true});
+
+document.querySelectorAll('[data-device]').forEach(b=>{
+  b.addEventListener('click', ()=>{
+    document.querySelectorAll('[data-device]').forEach(x=>x.setAttribute('aria-pressed', String(x===b)));
+    dispositivo = b.dataset.device;
+    zoomAuto = true;
+    aplicarZoom();
+  });
+});
+
+document.querySelectorAll('[data-modo]').forEach(b=>{
+  b.addEventListener('click', ()=>{
+    document.querySelectorAll('[data-modo]').forEach(x=>x.setAttribute('aria-pressed', String(x===b)));
+    modo = b.dataset.modo;
+    limpiarSeleccion();
+    pintarVista();
+    aviso(modo === 'editar' ? 'Tocá cualquier texto de la página para escribir' : 'Modo visitante: los enlaces y las preguntas funcionan');
+  });
+});
 
 /* =========================================================
    RUBROS Y PROYECTOS
@@ -169,14 +447,17 @@ function pintarRubros(){
 listaTpl.addEventListener('click', e=>{
   const b = e.target.closest('[data-rubro]'); if(!b) return;
   abrirRubro(b.dataset.rubro);
-  if(innerWidth<=1040) irA('editar');
+  if(innerWidth<=1040) irA('vista');
 });
 
 function abrirRubro(id, datos, pid, nombre){
   TPL = RUBROS.find(r=>r.id===id) || RUBROS[0];
-  D = clonar(datos || leerBorrador(TPL.id) || TPL.d);
-  camposVisibles().forEach(c=>{ if(D[c.k]===undefined) D[c.k] = clonar(TPL.d[c.k] ?? (c.t==='lista'?[]:'')); });
+  D = Object.assign({}, ESTILO_POR_DEFECTO, clonar(datos || leerBorrador(TPL.id) || TPL.d));
+  camposVisibles().forEach(c=>{
+    if(D[c.k] === undefined) D[c.k] = clonar(TPL.d[c.k] ?? ESTILO_POR_DEFECTO[c.k] ?? (c.t==='lista'?[]:''));
+  });
   proyectoId = pid || null;
+  seleccion = null; ocultarBarra();
   inpNombre.value = nombre || (TPL.d.marca + ' — ' + TPL.rubro);
   pintarRubros(); pintarPanel(); pintarVista(); pintarProyectos();
 }
@@ -197,7 +478,7 @@ listaProj.addEventListener('click', async e=>{
   const b = e.target.closest('[data-proj]'); if(!b) return;
   const p = (almacen.cache||[]).find(x=>x.id===b.dataset.proj); if(!p) return;
   abrirRubro(p.rubro, p.datos, p.id, p.nombre);
-  if(innerWidth<=1040) irA('editar');
+  if(innerWidth<=1040) irA('vista');
 });
 
 /* =========================================================
@@ -267,9 +548,8 @@ async function borrar(id){
 }
 
 /* =========================================================
-   EXPORTAR Y VER EL CÓDIGO
+   EXPORTAR Y VER EL CÓDIGO  (sin marcas de edición)
    ========================================================= */
-/* Descarga directa del navegador: es la vía normal en el sitio publicado. */
 function descargarBlob(nombre, html){
   try{
     const url = URL.createObjectURL(new Blob([html], {type:'text/html;charset=utf-8'}));
@@ -284,7 +564,6 @@ function descargarBlob(nombre, html){
 async function exportar(){
   const html = renderDoc(TPL, D);
   const nombre = slug(D.marca || TPL.rubro) + '.html';
-  // Dentro del visor de Artifacts la descarga pasa por la capacidad del anfitrión.
   if(cap.downloads){
     try{
       await cap.downloads.save({ filename:nombre, data:html });
@@ -328,15 +607,16 @@ function verCodigo(html, nota){
 }
 
 /* =========================================================
-   CONTROLES
+   CONTROLES GENERALES
    ========================================================= */
 $('#btn-save').addEventListener('click', ()=>guardar());
 $('#btn-export').addEventListener('click', exportar);
 $('#btn-code').addEventListener('click', ()=>verCodigo());
 $('#btn-new').addEventListener('click', ()=>{
   proyectoId = null;
-  D = clonar(TPL.d);
+  D = Object.assign({}, ESTILO_POR_DEFECTO, clonar(TPL.d));
   inpNombre.value = TPL.d.marca + ' — ' + TPL.rubro;
+  limpiarSeleccion();
   pintarPanel(); pintarVista(); pintarProyectos();
   aviso('Plantilla reiniciada');
 });
@@ -356,22 +636,15 @@ $('#btn-tema').addEventListener('click', ()=>{
   aviso(nuevo === 'dark' ? 'Tema oscuro' : 'Tema claro');
 });
 
-document.querySelectorAll('[data-device]').forEach(b=>{
-  b.addEventListener('click', ()=>{
-    document.querySelectorAll('[data-device]').forEach(x=>x.setAttribute('aria-pressed', String(x===b)));
-    const d = b.dataset.device;
-    $('#canvas').dataset.device = d;
-    $('#dims').textContent = d==='movil' ? '390 px' : d==='tablet' ? '820 px' : '100%';
-  });
-});
-
 function irA(tab){
   document.body.dataset.tab = tab;
   document.querySelectorAll('.tabbar button').forEach(b=>b.setAttribute('aria-pressed', String(b.dataset.tab===tab)));
+  aplicarZoom();
 }
 document.querySelectorAll('.tabbar button').forEach(b=> b.addEventListener('click', ()=>irA(b.dataset.tab)));
 
-/* ---------- arranque: abre con un rubro cargado y la vista lista ---------- */
+/* ---------- arranque ---------- */
 irA('vista');
 abrirRubro(RUBROS[0].id);
+aplicarZoom();
 almacen.init();

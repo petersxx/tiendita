@@ -50,21 +50,35 @@
     <div class="tpl-list" id="tpl-list"></div>
     <div class="rail-h">Mis proyectos <button class="btn ghost tiny" id="btn-new" type="button">+ Nuevo</button></div>
     <div id="proj-list"></div>
+    <div class="rail-h" style="margin-top:22px">Cómo se edita</div>
+    <p class="empty">Tocá cualquier texto <b>en la página</b> y escribí encima. Al elegir un ítem repetido aparece una barra para subirlo, duplicarlo o quitarlo.</p>
     <div class="rail-h" style="margin-top:22px">Dónde se guarda</div>
     <p class="empty" id="store-note">Comprobando…</p>
   </aside>
 
   <section class="pane stage">
     <div class="stage-bar">
+      <div class="seg" role="group" aria-label="Modo de trabajo">
+        <button type="button" data-modo="editar" aria-pressed="true">Editar</button>
+        <button type="button" data-modo="ver" aria-pressed="false">Previsualizar</button>
+      </div>
       <div class="seg" role="group" aria-label="Ancho de pantalla">
         <button type="button" data-device="escritorio" aria-pressed="true">Escritorio</button>
         <button type="button" data-device="tablet" aria-pressed="false">Tablet</button>
         <button type="button" data-device="movil" aria-pressed="false">Móvil</button>
       </div>
-      <span class="dims" id="dims">100%</span>
+      <div class="zoom" role="group" aria-label="Zoom">
+        <button type="button" id="zoom-menos" aria-label="Achicar" title="Achicar">−</button>
+        <span id="zoom-val">100%</span>
+        <button type="button" id="zoom-mas" aria-label="Agrandar" title="Agrandar">+</button>
+        <button type="button" id="zoom-ajustar" class="ajustar" title="Ajustar a la ventana">Ajustar</button>
+      </div>
+      <span class="dims" id="dims">1280 px de ancho</span>
     </div>
-    <div class="canvas" id="canvas" data-device="escritorio">
-      <div class="frame"><iframe id="preview" title="Vista previa de la página"></iframe></div>
+    <div class="canvas" id="canvas">
+      <div class="marco-wrap" id="marco-wrap">
+        <div class="frame" id="marco"><iframe id="preview" title="Vista previa de la página"></iframe></div>
+      </div>
     </div>
   </section>
 
@@ -76,6 +90,14 @@
   <button type="button" data-tab="editar" aria-pressed="false">Editar</button>
   <button type="button" data-tab="vista" aria-pressed="true">Vista</button>
 </nav>
+
+<div class="barra-lienzo" id="barra-lienzo" hidden role="toolbar" aria-label="Acciones del elemento elegido">
+  <button type="button" data-bact="up"   title="Subir" aria-label="Subir">↑</button>
+  <button type="button" data-bact="down" title="Bajar" aria-label="Bajar">↓</button>
+  <button type="button" data-bact="dup"  title="Duplicar" aria-label="Duplicar">⧉</button>
+  <button type="button" data-bact="img"  title="Imagen" aria-label="Imagen">⌗</button>
+  <button type="button" data-bact="rm" class="rm" title="Quitar" aria-label="Quitar">✕</button>
+</div>
 
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 

@@ -27,6 +27,32 @@ facturación a RUC y medios de pago locales (Tigo Money, Billetera Personal, Zim
 | Eventos | Salón de fiestas, organización |
 | Turismo y hotelería | Hotel, posada, excursiones |
 
+## Edición directa sobre la página
+
+No hace falta buscar el campo en un formulario: **se toca el texto en la misma
+página y se escribe encima**. Al elegir algo:
+
+- el texto queda editable en el lugar y el panel salta al campo que le corresponde;
+- si es parte de una lista (un producto, un renglón de precios, un paso), aparece
+  una barra flotante para subirlo, bajarlo, duplicarlo o quitarlo;
+- si es una imagen, la barra permite quitarla y volver al fondo generado.
+
+El panel también funciona al revés: al enfocar un campo, la página se desplaza y
+resalta el elemento correspondiente.
+
+El botón **Previsualizar** apaga la edición y deja la página como la ve un
+visitante, con los enlaces y las preguntas desplegables funcionando.
+
+Las marcas que hacen posible todo esto (`data-campo`, `data-item`) existen sólo en
+la vista previa. El HTML exportado sale sin ellas.
+
+## Controles visuales
+
+- **Zoom** con `−` / `+` / *Ajustar*, y anchos reales de escritorio (1280 px),
+  tablet (820 px) y móvil (390 px).
+- **Deslizadores** para el tamaño del texto, el redondeo de las esquinas y el aire
+  entre secciones. Se aplican al instante sobre variables CSS, sin rehacer la página.
+
 ## Cómo funciona
 
 Una plantilla no es un archivo HTML suelto: es una **lista de secciones** más su
@@ -47,7 +73,15 @@ css/taller.css      Estilos del editor (claro y oscuro)
 js/motor.js         Utilidades, tipografías, paletas, fondos generados, CSS de las páginas
 js/secciones.js     Secciones reutilizables, sus campos y el armado del documento final
 js/rubros.js        Los 14 rubros con su contenido de arranque
-js/app.js           Panel de edición, vista previa, guardado y exportación
+js/app.js           Panel, edición directa, zoom, guardado y exportación
+tools/build-artifact.mjs   Arma el archivo único que consume el Artifact de Claude
+```
+
+La versión publicada como Artifact de Claude es el mismo código en un solo
+archivo. No se edita a mano: se genera con
+
+```bash
+node tools/build-artifact.mjs dist/taller-de-paginas.html
 ```
 
 ## Correrlo localmente

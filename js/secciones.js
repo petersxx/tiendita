@@ -1,8 +1,24 @@
 /* =========================================================
    SECCIONES — cada una declara sus campos y su HTML.
    Un rubro es una lista de secciones + contenido propio.
+
+   El tercer argumento `a` marca los nodos editables. En la vista
+   previa devuelve atributos (data-campo, data-campo-img, data-item)
+   que la capa de edición usa para saber qué toca cada clic; al
+   exportar devuelve cadenas vacías, así el HTML sale limpio.
    ========================================================= */
 const ANCLAS = { cards:'#catalogo', precios:'#precios', texto:'#nosotros', faq:'#preguntas', contacto:'#contacto' };
+
+function marcas(activo){
+  const q = s => String(s).replace(/"/g,'&quot;');
+  if(!activo){ const nada = ()=> ''; return { c:nada, p:nada, im:nada, it:nada }; }
+  return {
+    c:  r => ` data-campo="${q(r)}"`,                    // texto de una línea
+    p:  r => ` data-campo="${q(r)}" data-multi="1"`,     // texto de varios párrafos
+    im: r => ` data-campo-img="${q(r)}"`,                // imagen o fondo generado
+    it: r => ` data-item="${q(r)}"`,                     // ítem de una lista repetible
+  };
+}
 
 const SEC = {
   nav: {
@@ -13,11 +29,11 @@ const SEC = {
         nuevo:{txt:'Sección', url:'#'},
         item:[{k:'txt',l:'Texto',t:'text'},{k:'url',l:'Destino',t:'text'}]},
     ],
-    html:(d,t)=>`
+    html:(d,t,a)=>`
 <header class="nav"><div class="wrap">
-  <a class="marca" href="#">${esc(d.marca)}</a>
-  <nav class="nav-links">${(d.navLinks||[]).map(l=>`<a href="${esc(l.url)}">${esc(l.txt)}</a>`).join('')}</nav>
-  <a class="btn" href="${wa(d.whatsapp,'Hola '+d.marca+', vi su página y quiero consultar.')}">${esc(d.navCta)}</a>
+  <a class="marca" href="#"${a.c('marca')}>${esc(d.marca)}</a>
+  <nav class="nav-links">${(d.navLinks||[]).map((l,i)=>`<a href="${esc(l.url)}"${a.c(`navLinks.${i}.txt`)}>${esc(l.txt)}</a>`).join('')}</nav>
+  <a class="btn" href="${wa(d.whatsapp,'Hola '+d.marca+', vi su página y quiero consultar.')}"${a.c('navCta')}>${esc(d.navCta)}</a>
 </div></header>`
   },
 
@@ -30,33 +46,33 @@ const SEC = {
       {k:'heroCtaUrl', g:'Portada',l:'Destino del botón',t:'text'},
       {k:'heroImg',    g:'Portada',l:'Imagen de portada',t:'img'},
     ],
-    html:(d,t)=>`
+    html:(d,t,a)=>`
 <section class="hero hero-split"><div class="wrap">
   <div>
-    <span class="eyebrow">${esc(d.heroEyebrow)}</span>
-    <h1>${esc(d.heroTitulo)}</h1>
-    <p class="lead">${esc(d.heroTexto)}</p>
+    <span class="eyebrow"${a.c('heroEyebrow')}>${esc(d.heroEyebrow)}</span>
+    <h1${a.c('heroTitulo')}>${esc(d.heroTitulo)}</h1>
+    <p class="lead"${a.c('heroTexto')}>${esc(d.heroTexto)}</p>
     <div class="acciones">
-      <a class="btn" href="${esc(d.heroCtaUrl)}">${esc(d.heroCta)}</a>
+      <a class="btn" href="${esc(d.heroCtaUrl)}"${a.c('heroCta')}>${esc(d.heroCta)}</a>
       <a class="btn alt" href="${wa(d.whatsapp,'Hola '+d.marca+', quiero más información.')}">WhatsApp</a>
     </div>
   </div>
-  ${media(d.heroImg,t,0,'')}
+  ${media(d.heroImg,t,0,'',a.im('heroImg'))}
 </div></section>`
   },
 
   heroBanner: {
     campos:'heroSplit',
-    html:(d,t)=>`
+    html:(d,t,a)=>`
 <section class="hero hero-banner">
-  <div class="fondo" ${d.heroImg?'':`style="${arte(t,2)}"`}>${d.heroImg?`<img src="${esc(d.heroImg)}" alt="">`:''}</div>
+  <div class="fondo" ${d.heroImg?'':`style="${arte(t,2)}"`}${a.im('heroImg')}>${d.heroImg?`<img src="${esc(d.heroImg)}" alt="">`:''}</div>
   <div class="velo"></div>
   <div class="wrap">
-    <span class="eyebrow">${esc(d.heroEyebrow)}</span>
-    <h1>${esc(d.heroTitulo)}</h1>
-    <p class="lead">${esc(d.heroTexto)}</p>
+    <span class="eyebrow"${a.c('heroEyebrow')}>${esc(d.heroEyebrow)}</span>
+    <h1${a.c('heroTitulo')}>${esc(d.heroTitulo)}</h1>
+    <p class="lead"${a.c('heroTexto')}>${esc(d.heroTexto)}</p>
     <div class="acciones">
-      <a class="btn" href="${esc(d.heroCtaUrl)}">${esc(d.heroCta)}</a>
+      <a class="btn" href="${esc(d.heroCtaUrl)}"${a.c('heroCta')}>${esc(d.heroCta)}</a>
       <a class="btn alt" href="${wa(d.whatsapp,'Hola '+d.marca+', quiero más información.')}">Escribir por WhatsApp</a>
     </div>
   </div>
@@ -65,13 +81,13 @@ const SEC = {
 
   heroTipo: {
     campos:'heroSplit',
-    html:(d,t)=>`
+    html:(d,t,a)=>`
 <section class="hero hero-tipo"><div class="wrap">
-  <span class="eyebrow">${esc(d.heroEyebrow)}</span>
-  <h1>${esc(d.heroTitulo)}</h1>
-  <p class="lead">${esc(d.heroTexto)}</p>
+  <span class="eyebrow"${a.c('heroEyebrow')}>${esc(d.heroEyebrow)}</span>
+  <h1${a.c('heroTitulo')}>${esc(d.heroTitulo)}</h1>
+  <p class="lead"${a.c('heroTexto')}>${esc(d.heroTexto)}</p>
   <div class="acciones">
-    <a class="btn" href="${esc(d.heroCtaUrl)}">${esc(d.heroCta)}</a>
+    <a class="btn" href="${esc(d.heroCtaUrl)}"${a.c('heroCta')}>${esc(d.heroCta)}</a>
     <a class="btn alt" href="${wa(d.whatsapp,'Hola '+d.marca+', quiero más información.')}">WhatsApp</a>
   </div>
   <div class="regla"></div>
@@ -84,9 +100,12 @@ const SEC = {
         nuevo:{valor:'100+',etiqueta:'Dato'},
         item:[{k:'valor',l:'Cifra',t:'text'},{k:'etiqueta',l:'Qué mide',t:'text'}]},
     ],
-    html:(d,t)=> !(d.tiras||[]).length ? '' : `
+    html:(d,t,a)=> !(d.tiras||[]).length ? '' : `
 <div class="tiras"><div class="wrap">
-  ${d.tiras.map(x=>`<div class="tira"><b>${esc(x.valor)}</b><span>${esc(x.etiqueta)}</span></div>`).join('')}
+  ${d.tiras.map((x,i)=>`<div class="tira"${a.it(`tiras.${i}`)}>
+    <b${a.c(`tiras.${i}.valor`)}>${esc(x.valor)}</b>
+    <span${a.c(`tiras.${i}.etiqueta`)}>${esc(x.etiqueta)}</span>
+  </div>`).join('')}
 </div></div>`
   },
 
@@ -99,17 +118,17 @@ const SEC = {
         item:[{k:'titulo',l:'Título',t:'text'},{k:'meta',l:'Dato destacado (precio, medida, duración)',t:'text'},
               {k:'texto',l:'Descripción',t:'textarea'},{k:'img',l:'Imagen',t:'img'}]},
     ],
-    html:(d,t)=>`
+    html:(d,t,a)=>`
 <section class="sec" id="catalogo"><div class="wrap">
-  <div class="sec-h"><h2>${esc(d.cardsTitulo)}</h2>${d.cardsIntro?`<p>${esc(d.cardsIntro)}</p>`:''}</div>
+  <div class="sec-h"><h2${a.c('cardsTitulo')}>${esc(d.cardsTitulo)}</h2>${d.cardsIntro?`<p${a.c('cardsIntro')}>${esc(d.cardsIntro)}</p>`:''}</div>
   <div class="rejilla ${esc(d._cardStyle||'grid')}">
     ${(d.cards||[]).map((c,i)=>`
-    <article class="tarj">
-      ${media(c.img,t,i+1,'')}
+    <article class="tarj"${a.it(`cards.${i}`)}>
+      ${media(c.img,t,i+1,'',a.im(`cards.${i}.img`))}
       <div class="cuerpo">
-        <h3>${esc(c.titulo)}</h3>
-        ${c.meta?`<div class="meta">${esc(c.meta)}</div>`:''}
-        ${c.texto?`<p>${esc(c.texto)}</p>`:''}
+        <h3${a.c(`cards.${i}.titulo`)}>${esc(c.titulo)}</h3>
+        ${c.meta?`<div class="meta"${a.c(`cards.${i}.meta`)}>${esc(c.meta)}</div>`:''}
+        ${c.texto?`<p${a.c(`cards.${i}.texto`)}>${esc(c.texto)}</p>`:''}
       </div>
     </article>`).join('')}
   </div>
@@ -125,19 +144,20 @@ const SEC = {
         item:[{k:'seccion',l:'Grupo (agrupa los renglones)',t:'text'},{k:'nombre',l:'Nombre',t:'text'},
               {k:'detalle',l:'Detalle',t:'text'},{k:'precio',l:'Precio',t:'text'}]},
     ],
-    html:(d,t)=>{
-      const g = {}; (d.precios||[]).forEach(r=>{ (g[r.seccion||''] ||= []).push(r); });
+    html:(d,t,a)=>{
+      const g = {};
+      (d.precios||[]).forEach((r,i)=>{ (g[r.seccion||''] ||= []).push({...r, _i:i}); });
       return `
 <section class="sec" id="precios"><div class="wrap">
-  <div class="sec-h"><h2>${esc(d.preciosTitulo)}</h2>${d.preciosIntro?`<p>${esc(d.preciosIntro)}</p>`:''}</div>
+  <div class="sec-h"><h2${a.c('preciosTitulo')}>${esc(d.preciosTitulo)}</h2>${d.preciosIntro?`<p${a.c('preciosIntro')}>${esc(d.preciosIntro)}</p>`:''}</div>
   <div class="precios">
     ${Object.entries(g).map(([sec,rows])=>`
     <div class="bloque">
-      ${sec?`<h3>${esc(sec)}</h3>`:''}
-      ${rows.map(r=>`<div class="fila">
-        <span class="nom">${esc(r.nombre)}</span>
-        <span class="det">${esc(r.detalle)}</span>
-        <span class="pre">${esc(r.precio)}</span>
+      ${sec?`<h3${a.c(`precios.${rows[0]._i}.seccion`)}>${esc(sec)}</h3>`:''}
+      ${rows.map(r=>`<div class="fila"${a.it(`precios.${r._i}`)}>
+        <span class="nom"${a.c(`precios.${r._i}.nombre`)}>${esc(r.nombre)}</span>
+        <span class="det"${a.c(`precios.${r._i}.detalle`)}>${esc(r.detalle)}</span>
+        <span class="pre"${a.c(`precios.${r._i}.precio`)}>${esc(r.precio)}</span>
       </div>`).join('')}
     </div>`).join('')}
   </div>
@@ -152,11 +172,14 @@ const SEC = {
         nuevo:{titulo:'Paso nuevo',texto:''},
         item:[{k:'titulo',l:'Título del paso',t:'text'},{k:'texto',l:'Qué pasa acá',t:'textarea'}]},
     ],
-    html:(d,t)=>`
+    html:(d,t,a)=>`
 <section class="sec"><div class="wrap">
-  <div class="sec-h"><h2>${esc(d.pasosTitulo)}</h2></div>
+  <div class="sec-h"><h2${a.c('pasosTitulo')}>${esc(d.pasosTitulo)}</h2></div>
   <div class="pasos">
-    ${(d.pasos||[]).map(p=>`<div class="paso"><h3>${esc(p.titulo)}</h3><p>${esc(p.texto)}</p></div>`).join('')}
+    ${(d.pasos||[]).map((p,i)=>`<div class="paso"${a.it(`pasos.${i}`)}>
+      <h3${a.c(`pasos.${i}.titulo`)}>${esc(p.titulo)}</h3>
+      <p${a.c(`pasos.${i}.texto`)}>${esc(p.texto)}</p>
+    </div>`).join('')}
   </div>
 </div></section>`
   },
@@ -167,10 +190,13 @@ const SEC = {
       {k:'textoCuerpo',g:'Sobre el negocio',l:'Texto (una línea en blanco separa párrafos)',t:'textarea'},
       {k:'textoImg',   g:'Sobre el negocio',l:'Imagen',t:'img'},
     ],
-    html:(d,t)=>`
+    html:(d,t,a)=>`
 <section class="sec dueto" id="nosotros"><div class="wrap">
-  ${media(d.textoImg,t,5,'')}
-  <div><h2>${esc(d.textoTitulo)}</h2><div class="texto">${parrafos(d.textoCuerpo)}</div></div>
+  ${media(d.textoImg,t,5,'',a.im('textoImg'))}
+  <div>
+    <h2${a.c('textoTitulo')}>${esc(d.textoTitulo)}</h2>
+    <div class="texto"${a.p('textoCuerpo')}>${parrafos(d.textoCuerpo)}</div>
+  </div>
 </div></section>`
   },
 
@@ -181,11 +207,14 @@ const SEC = {
         nuevo:{p:'¿Pregunta?',r:'Respuesta.'},
         item:[{k:'p',l:'Pregunta',t:'text'},{k:'r',l:'Respuesta',t:'textarea'}]},
     ],
-    html:(d,t)=>`
+    html:(d,t,a)=>`
 <section class="sec" id="preguntas"><div class="wrap">
-  <div class="sec-h"><h2>${esc(d.faqTitulo)}</h2></div>
+  <div class="sec-h"><h2${a.c('faqTitulo')}>${esc(d.faqTitulo)}</h2></div>
   <div class="faq">
-    ${(d.faq||[]).map((f,i)=>`<details${i===0?' open':''}><summary>${esc(f.p)}</summary><div class="r">${parrafos(f.r)}</div></details>`).join('')}
+    ${(d.faq||[]).map((f,i)=>`<details${i===0?' open':''}${a.it(`faq.${i}`)}>
+      <summary><span${a.c(`faq.${i}.p`)}>${esc(f.p)}</span></summary>
+      <div class="r"${a.p(`faq.${i}.r`)}>${parrafos(f.r)}</div>
+    </details>`).join('')}
   </div>
 </div></section>`
   },
@@ -197,11 +226,14 @@ const SEC = {
         nuevo:{texto:'',autor:''},
         item:[{k:'texto',l:'Comentario',t:'textarea'},{k:'autor',l:'Quién lo dice',t:'text'}]},
     ],
-    html:(d,t)=>`
+    html:(d,t,a)=>`
 <section class="sec"><div class="wrap">
-  <div class="sec-h"><h2>${esc(d.testiTitulo)}</h2></div>
+  <div class="sec-h"><h2${a.c('testiTitulo')}>${esc(d.testiTitulo)}</h2></div>
   <div class="citas">
-    ${(d.testimonios||[]).map(c=>`<blockquote class="cita"><p>“${esc(c.texto)}”</p><b>${esc(c.autor)}</b></blockquote>`).join('')}
+    ${(d.testimonios||[]).map((c,i)=>`<blockquote class="cita"${a.it(`testimonios.${i}`)}>
+      <p${a.c(`testimonios.${i}.texto`)}>${esc(c.texto)}</p>
+      <b${a.c(`testimonios.${i}.autor`)}>${esc(c.autor)}</b>
+    </blockquote>`).join('')}
   </div>
 </div></section>`
   },
@@ -220,21 +252,23 @@ const SEC = {
       {k:'mapaUrl',  g:'Contacto',l:'Enlace a Google Maps',t:'text'},
       {k:'pago',     g:'Contacto',l:'Formas de pago',t:'text'},
     ],
-    html:(d,t)=>{
-      const fila = (et,val,href) => !val ? '' :
-        `<div class="dato"><b>${esc(et)}</b><span>${href?`<a href="${esc(href)}">${esc(val)}</a>`:esc(val)}</span></div>`;
+    html:(d,t,a)=>{
+      const fila = (et,val,href,ruta) => !val ? '' :
+        `<div class="dato"><b>${esc(et)}</b><span>${href
+          ? `<a href="${esc(href)}"${ruta?a.c(ruta):''}>${esc(val)}</a>`
+          : `<span${ruta?a.c(ruta):''}>${esc(val)}</span>`}</span></div>`;
       return `
 <section class="sec contacto" id="contacto"><div class="wrap">
   <div>
-    <div class="sec-h"><h2>${esc(d.contactoTitulo)}</h2>${d.contactoTexto?`<p>${esc(d.contactoTexto)}</p>`:''}</div>
+    <div class="sec-h"><h2${a.c('contactoTitulo')}>${esc(d.contactoTitulo)}</h2>${d.contactoTexto?`<p${a.c('contactoTexto')}>${esc(d.contactoTexto)}</p>`:''}</div>
     <div class="datos">
-      ${fila('WhatsApp', d.whatsapp, wa(d.whatsapp,'Hola '+d.marca+', quiero hacer una consulta.'))}
-      ${fila('Teléfono', d.telefono, tel(d.telefono))}
+      ${fila('WhatsApp', d.whatsapp, wa(d.whatsapp,'Hola '+d.marca+', quiero hacer una consulta.'), 'whatsapp')}
+      ${fila('Teléfono', d.telefono, tel(d.telefono), 'telefono')}
       ${fila('Dirección', [d.direccion,d.ciudad].filter(Boolean).join(', '), d.mapaUrl||'')}
-      ${fila('Horario', d.horario)}
+      ${fila('Horario', d.horario, '', 'horario')}
       ${fila('Instagram', d.instagram?('@'+String(d.instagram).replace(/^@/,'')):'', ig(d.instagram))}
-      ${fila('Correo', d.email, d.email?('mailto:'+d.email):'')}
-      ${fila('Pagos', d.pago)}
+      ${fila('Correo', d.email, d.email?('mailto:'+d.email):'', 'email')}
+      ${fila('Pagos', d.pago, '', 'pago')}
     </div>
     <div class="acciones">
       <a class="btn" href="${wa(d.whatsapp,'Hola '+d.marca+', quiero hacer una consulta.')}">Escribir por WhatsApp</a>
@@ -248,9 +282,9 @@ const SEC = {
 
   pie: {
     campos:[],
-    html:(d,t)=>`
+    html:(d,t,a)=>`
 <footer class="pie"><div class="wrap">
-  <span class="marca">${esc(d.marca)}</span>
+  <span class="marca"${a.c('marca')}>${esc(d.marca)}</span>
   <span>© ${new Date().getFullYear()} ${esc(d.marca)}${d.ciudad?' · '+esc(d.ciudad)+', Paraguay':' · Paraguay'}</span>
   ${d.instagram?`<a href="${ig(d.instagram)}">Instagram</a>`:''}
   <a href="${wa(d.whatsapp,'Hola '+d.marca)}">WhatsApp</a>
@@ -265,9 +299,18 @@ const CAMPOS_ESTILO = [
   {k:'_fg',    g:'Estilo',l:'Texto',t:'color'},
   {k:'_font',  g:'Estilo',l:'Tipografía',t:'select',
     opts:Object.entries(FUENTES).map(([v,f])=>({v,l:f.l}))},
+  {k:'_escala',g:'Estilo',l:'Tamaño del texto',t:'rango',min:0.85,max:1.3,paso:0.05,vivo:'--esc',
+    formato:v=>Math.round(v*100)+'%'},
+  {k:'_radio', g:'Estilo',l:'Redondeo de esquinas',t:'rango',min:0,max:28,paso:1,vivo:'--rad',unidad:'px',
+    formato:v=>Math.round(v)+' px'},
+  {k:'_aire',  g:'Estilo',l:'Aire entre secciones',t:'rango',min:0.6,max:1.5,paso:0.05,vivo:'--aire',
+    formato:v=>Math.round(v*100)+'%'},
   {k:'_cardStyle',g:'Estilo',l:'Disposición del catálogo',t:'select',
     opts:[{v:'grid',l:'Cuadrícula'},{v:'compacto',l:'Cuadrícula compacta'},{v:'ancho',l:'Filas anchas'}]},
 ];
+
+/* valores de estilo que todo rubro hereda si no los define */
+const ESTILO_POR_DEFECTO = { _escala:1, _radio:14, _aire:1 };
 
 /* reúne los campos de un rubro a partir de sus secciones */
 function camposDe(tpl){
@@ -282,10 +325,23 @@ function camposDe(tpl){
   return out;
 }
 
+/* ---------- capa de edición: sólo va en la vista previa ---------- */
+function capaEditorCss(){ return `
+[data-campo],[data-campo-img]{outline-offset:3px}
+[data-campo]{cursor:text}
+[data-campo-img]{cursor:pointer}
+[data-campo]:hover,[data-campo-img]:hover{outline:2px dashed #2563EB}
+[data-item]:hover{outline:1px dashed rgba(37,99,235,.45);outline-offset:7px}
+.tp-sel,.tp-sel:hover{outline:2px solid #2563EB !important;box-shadow:0 0 0 4px rgba(37,99,235,.20)}
+[data-campo][contenteditable="true"]{outline:2px solid #2563EB;box-shadow:0 0 0 4px rgba(37,99,235,.20)}
+[data-campo][contenteditable="true"]:empty::before{content:attr(data-vacio);opacity:.45}
+`; }
+
 /* documento final: HTML autónomo, listo para subir a cualquier hosting */
-function renderDoc(tpl, d){
+function renderDoc(tpl, d, editable){
   const t = tema(d);
-  const cuerpo = tpl.secciones.map(n => SEC[n] ? SEC[n].html(d,t) : '').join('\n');
+  const a = marcas(!!editable);
+  const cuerpo = tpl.secciones.map(n => SEC[n] ? SEC[n].html(d,t,a) : '').join('\n');
   const titulo = [d.marca, tpl.rubro].filter(Boolean).join(' — ');
   const desc = (d.heroTexto || d.contactoTexto || '').slice(0,155);
   return `<!doctype html>
@@ -301,7 +357,7 @@ function renderDoc(tpl, d){
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="${t.url}">
-<style>${kitCss(t)}</style>
+<style>${kitCss(t)}${editable ? capaEditorCss() : ''}</style>
 </head>
 <body>
 ${cuerpo}
