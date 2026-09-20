@@ -117,6 +117,26 @@ navegador  ──PUT con esa URL──►  R2                    (el archivo nun
 página     ──GET /api/catalogo?db=…──►  Vercel  ──token de Notion──►  Notion
 ```
 
+### Estado de la configuración
+
+| | |
+|---|---|
+| Acceso público de R2 | listo — `https://pub-3a0ab81b24b7485b917cf49de2d1576f.r2.dev` |
+| `R2_ACCOUNT_ID`, `R2_BUCKET`, `R2_PUBLIC_BASE` | cargadas en Vercel |
+| `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY` | **faltan** (token de API del bucket) |
+| `NOTION_TOKEN` | **falta** (secreto de la integración) |
+| Regla CORS del bucket | **falta** (sin ella el navegador no puede subir) |
+| Base de Notion compartida con la integración | **falta** |
+
+Las que faltan son credenciales: cargalas vos, no deben pasar por un chat.
+
+```bash
+vercel env add R2_ACCESS_KEY_ID production
+vercel env add R2_SECRET_ACCESS_KEY production
+vercel env add NOTION_TOKEN production
+vercel --prod          # las variables recién se toman en el siguiente deploy
+```
+
 ### Variables de entorno en Vercel
 
 Se cargan una sola vez, desde el panel de Vercel o con `vercel env add <NOMBRE>`.
@@ -128,7 +148,7 @@ Se cargan una sola vez, desde el panel de Vercel o con `vercel env add <NOMBRE>`
 | `R2_BUCKET` | `tiendita` |
 | `R2_ACCESS_KEY_ID` | Del token de API de R2 |
 | `R2_SECRET_ACCESS_KEY` | Del token de API de R2 |
-| `R2_PUBLIC_BASE` | La URL **pública** del bucket (ver abajo). Sin barra final |
+| `R2_PUBLIC_BASE` | La URL **pública** del bucket, sin barra final. Ya cargada |
 | `NOTION_TOKEN` | El secreto de la integración de Notion |
 | `SUBIDA_TOKEN` | Opcional. Si la definís, hay que escribirla en el editor para poder subir |
 | `ORIGENES_PERMITIDOS` | Opcional. Orígenes que pueden subir, separados por coma |
