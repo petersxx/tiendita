@@ -73,8 +73,7 @@ css/taller.css      Estilos del editor (claro y oscuro)
 js/motor.js         Utilidades, tipografías, paletas, fondos generados, CSS de las páginas
 js/secciones.js     Secciones reutilizables, sus campos y el armado del documento final
 js/rubros.js        Los 14 rubros con su contenido de arranque
-js/app.js           Panel, edición directa, zoom, subida a R2, guardado y exportación
-api/subir.js        Firma la subida a R2 (las claves no salen del servidor)
+js/app.js           Panel, edición directa, zoom, imágenes, guardado, exportación y publicación
 api/catalogo.js     Lee la base de productos de Notion y la normaliza
 api/publicar.js     Publica una demo como proyecto propio en Vercel
 api/_comun.js       CORS y utilidades compartidas
@@ -96,89 +95,27 @@ El editor es estático. Para levantarlo solo, sin las funciones de la API:
 python3 -m http.server 8777
 ```
 
-Para trabajar **también** con `/api/subir` y `/api/catalogo`, hace falta el
+Para trabajar **también** con `/api/publicar` y `/api/catalogo`, hace falta el
 entorno de Vercel, que carga las variables:
 
 ```bash
-npm install
 vercel env pull        # trae las variables a .env.local
 vercel dev             # editor + API en http://localhost:3000
 ```
 
-## Imágenes en Cloudflare R2 y catálogo en Notion
+## Catálogo en Notion
 
-El editor sube imágenes a un bucket de R2 y puede traer los productos de una
-base de Notion. Ninguna clave vive en el navegador: hay dos funciones en
-`api/` que las guardan del lado del servidor.
+El editor puede traer los productos de una base de Notion. El token vive del
+lado del servidor, en `api/catalogo.js`.
 
 ```
-navegador  ──POST /api/subir──►  Vercel  ──firma con las claves de R2──►  URL prefirmada
-navegador  ──PUT con esa URL──►  R2                    (el archivo nunca pasa por Vercel)
-
 página     ──GET /api/catalogo?db=…──►  Vercel  ──token de Notion──►  Notion
 ```
 
-### Estado de la configuración
-
-| | |
-|---|---|
-| Acceso público de R2 | listo — `https://pub-3a0ab81b24b7485b917cf49de2d1576f.r2.dev` |
-| `R2_ACCOUNT_ID`, `R2_BUCKET`, `R2_PUBLIC_BASE` | cargadas en Vercel |
-| `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY` | **faltan** (token de API del bucket) |
-| `NOTION_TOKEN` | **falta** (secreto de la integración) |
-| Regla CORS del bucket | **falta** (sin ella el navegador no puede subir) |
-| Base de Notion compartida con la integración | **falta** |
-
-Las que faltan son credenciales: cargalas vos, no deben pasar por un chat.
-
-```bash
-vercel env add R2_ACCESS_KEY_ID production
-vercel env add R2_SECRET_ACCESS_KEY production
-vercel env add NOTION_TOKEN production
-vercel --prod          # las variables recién se toman en el siguiente deploy
-```
-
-### Variables de entorno en Vercel
-
-Se cargan una sola vez, desde el panel de Vercel o con `vercel env add <NOMBRE>`.
-**Cargalas vos**: son credenciales y no deben pasar por un chat ni quedar en el repo.
-
 | Variable | Qué es |
 |---|---|
-| `R2_ACCOUNT_ID` | `f9d775fecdc16425d4e6f98d8c3b7555` (el de tu endpoint) |
-| `R2_BUCKET` | `tiendita` |
-| `R2_ACCESS_KEY_ID` | Del token de API de R2 |
-| `R2_SECRET_ACCESS_KEY` | Del token de API de R2 |
-| `R2_PUBLIC_BASE` | La URL **pública** del bucket, sin barra final. Ya cargada |
-| `NOTION_TOKEN` | El secreto de la integración de Notion |
-| `SUBIDA_TOKEN` | Opcional. Si la definís, hay que escribirla en el editor para poder subir |
-| `ORIGENES_PERMITIDOS` | Opcional. Orígenes que pueden subir, separados por coma |
-
-### Cloudflare R2: lo que falta configurar
-
-El endpoint `…r2.cloudflarestorage.com/tiendita` es la **API S3**, sirve para subir.
-Para *mostrar* las imágenes hace falta habilitar una URL pública aparte:
-
-1. **Acceso público.** En el panel de R2 → bucket `tiendita` → *Settings* → *Public
-   access*. O bien conectás un dominio propio (recomendado, ej. `img.tudominio.com`),
-   o habilitás el subdominio de desarrollo `r2.dev`. Cualquiera de los dos te da una
-   URL: esa es `R2_PUBLIC_BASE`.
-2. **Regla CORS**, sin la cual el navegador no puede subir. En el mismo bucket →
-   *Settings* → *CORS policy*:
-
-```json
-[
-  {
-    "AllowedOrigins": ["https://tiendita-ebon-one.vercel.app", "http://localhost:8777"],
-    "AllowedMethods": ["PUT"],
-    "AllowedHeaders": ["content-type"],
-    "MaxAgeSeconds": 3600
-  }
-]
-```
-
-3. **Token de API** con permiso de *Object Read & Write* sobre el bucket. De ahí
-   salen `R2_ACCESS_KEY_ID` y `R2_SECRET_ACCESS_KEY`.
+| `NOTION_TOKEN` | El secreto de la integración de Notion. **Falta cargarlo** |
+| `ORIGENES_PERMITIDOS` | Opcional. Orígenes que pueden llamar a `/api/publicar`, separados por coma |
 
 ### Notion: lo que falta configurar
 
@@ -264,12 +201,22 @@ En Vercel se publica sin configuración: los archivos de la raíz se sirven tal
 cual y lo que está en `api/` se convierte en funciones. Cada push a `main`
 genera un deploy.
 
-## Nota sobre las imágenes
+## Imágenes
 
-Si un campo de imagen queda vacío, se dibuja un fondo generado a partir del color
-de acento, así nunca se ve una foto rota. Si no, se usa la imagen: la que subiste
-a R2 o cualquier URL que pegues.
+Al tocar **Subir** (o arrastrar una foto sobre el campo), la imagen se achica en
+el navegador a 1920 px de lado como máximo, pasa a WebP y se guarda en el
+IndexedDB de ese navegador. La demo la nombra `img/<hash>.webp`.
 
-La vista previa del editor **sí** muestra las imágenes de R2. Dentro del Artifact
-de Claude no, porque ese visor bloquea las imágenes externas; ahí se ve el fondo
-generado y la imagen real aparece al exportar.
+- **Al publicar**, cada imagen viaja como un archivo más del deploy, al lado del
+  `index.html`. Se suben de a una (el límite de una función es 4,5 MB) y sólo
+  las que Vercel todavía no tiene: republicar una demo no las vuelve a mandar.
+- **Al exportar** o ver el HTML, las imágenes van incrustadas en el archivo, así
+  sigue siendo un solo archivo sin dependencias.
+- También se puede pegar la URL de cualquier imagen en el campo de texto.
+
+Las fotos quedan en **el navegador donde las subiste**. Si abrís el mismo
+proyecto en otra compu, esas imágenes no están; hay que volver a subirlas (la
+demo ya publicada no se ve afectada).
+
+Si un campo de imagen queda vacío, se dibuja un fondo generado a partir del
+color de acento, así nunca se ve una foto rota.

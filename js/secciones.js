@@ -125,7 +125,7 @@ const SEC = {
       {k:'_moneda',     g:'Catálogo desde Notion', l:'Prefijo del precio', t:'text',
         pista:'Se usa sólo si en Notion el precio es un número. Si lo escribís como texto, se respeta tal cual.'},
       {k:'_apiBase',    g:'Catálogo desde Notion', l:'Dirección de la API', t:'text',
-        pista:'El despliegue de Vercel que guarda las claves de Notion y R2.'},
+        pista:'El despliegue de Vercel que guarda las claves de Notion y publica las demos.'},
       {k:'_importar',   g:'Catálogo desde Notion', l:'', t:'accion',
         texto:'Importar productos ahora', accion:'importarNotion',
         pista:'Trae los productos de Notion y reemplaza la lista de arriba.'},

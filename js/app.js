@@ -59,7 +59,7 @@ function pistaHTML(c){ return c.pista ? `<span class="hint">${esc(c.pista)}</spa
 
 function cajaImagen(ruta, v){
   return `<div class="img-caja">
-    ${v ? `<img class="img-mini" src="${esc(v)}" alt="">`
+    ${v ? `<img class="img-mini" src="${esc(imagenes.vista(v))}" alt="">`
         : `<div class="img-mini vacia" aria-hidden="true">sin imagen</div>`}
     <div class="img-acciones">
       <button class="btn tiny" type="button" data-subir="${esc(ruta)}">Subir</button>
@@ -103,7 +103,7 @@ function campoHTML(c, ruta, esCabecera){
         <label for="${id}">${esc(c.l)}</label>
         ${cajaImagen(ruta, v)}
         <input type="text" id="${id}" data-path="${esc(ruta)}" value="${esc(v)}" placeholder="https://… o arrastrá un archivo acá">
-        <span class="hint">Arrastrá una imagen sobre este campo o tocá <b>Subir</b>: va a tu bucket R2. Vacío = fondo generado.</span></div>`;
+        <span class="hint">Arrastrá una imagen sobre este campo o tocá <b>Subir</b>: se achica y viaja con la demo al publicar. Vacío = fondo generado.</span></div>`;
     case 'lista':
       return listaHTML(c, ruta);
     default:
@@ -271,7 +271,7 @@ function pintarVista(){
     conectarLienzo();
     if(seleccion) restaurarSeleccion();
   };
-  preview.srcdoc = renderDoc(TPL, D, modo === 'editar');
+  preview.srcdoc = renderDoc(TPL, conImagenesLocales(D), modo === 'editar');
 }
 
 /* campos cuyo cambio afecta a otras partes de la página (enlaces, agrupaciones) */
@@ -623,7 +623,7 @@ function descargarBlob(nombre, html){
 }
 
 async function exportar(){
-  const html = renderDoc(TPL, D);
+  const html = await htmlAutonomo();
   const nombre = slug(D.marca || TPL.rubro) + '.html';
   if(cap.downloads){
     try{
@@ -639,8 +639,7 @@ async function exportar(){
   verCodigo(html, 'No se pudo descargar. Copiá el código y pegalo en un archivo .html');
 }
 
-function verCodigo(html, nota){
-  const codigo = html || renderDoc(TPL, D);
+function verCodigo(codigo, nota){
   const veil = document.createElement('div');
   veil.className = 'veil';
   veil.innerHTML = `<div class="sheet" role="dialog" aria-modal="true" aria-label="Código de la página">
@@ -672,7 +671,7 @@ function verCodigo(html, nota){
    ========================================================= */
 $('#btn-save').addEventListener('click', ()=>guardar());
 $('#btn-export').addEventListener('click', exportar);
-$('#btn-code').addEventListener('click', ()=>verCodigo());
+$('#btn-code').addEventListener('click', async ()=>verCodigo(await htmlAutonomo()));
 $('#btn-new').addEventListener('click', ()=>{
   proyectoId = null;
   D = Object.assign({}, ESTILO_POR_DEFECTO, clonar(TPL.d));
@@ -705,13 +704,13 @@ function irA(tab){
 document.querySelectorAll('.tabbar button').forEach(b=> b.addEventListener('click', ()=>irA(b.dataset.tab)));
 
 /* =========================================================
-   IMÁGENES EN R2 Y CATÁLOGO EN NOTION
-   El navegador nunca ve las claves: le pide a /api/subir una URL
-   firmada y manda el archivo derecho a Cloudflare.
+   IMÁGENES PROPIAS
+   Se achican en el navegador, se guardan en IndexedDB y la demo las
+   referencia como img/<hash>.<ext>. Al publicar viajan como archivos
+   del deploy; al exportar se incrustan en el HTML.
    ========================================================= */
-const CLAVE_SUBIDA = 'taller.claveSubida';
 /* Dentro del visor de Artifacts de Claude la CSP bloquea cualquier fetch
-   externo, así que subir a R2 o consultar Notion no puede funcionar ahí. */
+   externo, así que publicar o consultar Notion no puede funcionar ahí. */
 const EN_VISOR = !!(window.claude && window.claude.use);
 
 function explicarFalloDeRed(err){
@@ -722,6 +721,107 @@ function explicarFalloDeRed(err){
   }
   return String(err.message || err);
 }
+
+const LADO_MAX = 1920;                    // px del lado más largo
+const IMG_MAX_BYTES = 3 * 1024 * 1024;    // ya achicada; en base64 entra en una función de Vercel
+const ES_LOCAL = /^img\/[0-9a-f]{12}\.(webp|jpg|png|gif|svg)$/;
+const EXT_IMG = { 'image/webp':'webp', 'image/jpeg':'jpg', 'image/png':'png', 'image/gif':'gif', 'image/svg+xml':'svg' };
+
+/* recorre los datos y reemplaza cada texto con f() */
+function mapearTextos(o, f){
+  if(typeof o === 'string') return f(o);
+  if(Array.isArray(o)) return o.map(x=>mapearTextos(x, f));
+  if(o && typeof o === 'object'){ const r = {}; for(const k in o) r[k] = mapearTextos(o[k], f); return r; }
+  return o;
+}
+
+const imagenes = {
+  reg: {},            // nombre → { nombre, sha, blob }
+  urls: {},           // nombre → blob: URL para la vista previa
+  _db: null,
+
+  abrir(){
+    if(!this._db) this._db = new Promise((ok, mal)=>{
+      const r = indexedDB.open('taller', 1);
+      r.onupgradeneeded = ()=> r.result.createObjectStore('imagenes', { keyPath:'nombre' });
+      r.onsuccess = ()=> ok(r.result);
+      r.onerror = ()=> mal(r.error);
+    });
+    return this._db;
+  },
+  async tx(modo, fn){
+    const db = await this.abrir();
+    return new Promise((ok, mal)=>{
+      const t = db.transaction('imagenes', modo);
+      const pedido = fn(t.objectStore('imagenes'));
+      t.oncomplete = ()=> ok(pedido && pedido.result);
+      t.onerror = ()=> mal(t.error);
+    });
+  },
+  recordar(r){
+    this.reg[r.nombre] = r;
+    if(!this.urls[r.nombre]) this.urls[r.nombre] = URL.createObjectURL(r.blob);
+  },
+  async cargar(){
+    try{ (await this.tx('readonly', s=>s.getAll()) || []).forEach(r=>this.recordar(r)); }
+    catch(e){ /* sin IndexedDB las imágenes viven sólo mientras la pestaña esté abierta */ }
+  },
+  async guardar(blob){
+    const hash = await crypto.subtle.digest('SHA-1', await blob.arrayBuffer());
+    const sha = [...new Uint8Array(hash)].map(b=>b.toString(16).padStart(2,'0')).join('');
+    const nombre = `img/${sha.slice(0,12)}.${EXT_IMG[blob.type] || 'jpg'}`;
+    if(!this.reg[nombre]){
+      const r = { nombre, sha, blob };
+      this.recordar(r);
+      try{ await this.tx('readwrite', s=>s.put(r)); }catch(e){}
+    }
+    return nombre;
+  },
+  /* nombres img/… que usa la página, sin repetir */
+  usadas(d){
+    const set = new Set();
+    mapearTextos(d, v=>{ if(ES_LOCAL.test(v)) set.add(v); return v; });
+    return [...set];
+  },
+  vista(v){ return ES_LOCAL.test(v) ? (this.urls[v] || '') : v; },
+};
+
+/* los datos con las imágenes propias apuntando a blob: (para la vista previa) */
+function conImagenesLocales(d){ return mapearTextos(d, v=>imagenes.vista(v)); }
+
+function aDataURL(blob){
+  return new Promise((ok, mal)=>{
+    const f = new FileReader();
+    f.onload = ()=> ok(f.result); f.onerror = ()=> mal(f.error);
+    f.readAsDataURL(blob);
+  });
+}
+
+/* el HTML de un solo archivo: las imágenes propias van incrustadas */
+async function htmlAutonomo(){
+  const datos = {};
+  for(const n of imagenes.usadas(D)){ const r = imagenes.reg[n]; if(r) datos[n] = await aDataURL(r.blob); }
+  return renderDoc(TPL, mapearTextos(D, v=> ES_LOCAL.test(v) ? (datos[v] || '') : v));
+}
+
+/* achica fotos grandes; SVG y GIF (vectores, animaciones) pasan tal cual */
+async function achicar(archivo){
+  if(/svg|gif/.test(archivo.type)) return archivo;
+  let bmp;
+  try{ bmp = await createImageBitmap(archivo); }
+  catch(e){ throw new Error('Este navegador no puede leer esa imagen. Probá con JPG o PNG.'); }
+  const k = Math.min(1, LADO_MAX / Math.max(bmp.width, bmp.height));
+  const c = document.createElement('canvas');
+  c.width = Math.round(bmp.width * k); c.height = Math.round(bmp.height * k);
+  c.getContext('2d').drawImage(bmp, 0, 0, c.width, c.height);
+  if(bmp.close) bmp.close();
+  const aBlob = (tipo, q)=> new Promise(ok=>c.toBlob(ok, tipo, q));
+  let b = await aBlob('image/webp', .82);
+  if(!b || b.type !== 'image/webp') b = await aBlob(archivo.type === 'image/png' ? 'image/png' : 'image/jpeg', .85);
+  // si ya venía chica y en un formato conocido, no la empeoramos
+  return (k === 1 && EXT_IMG[archivo.type] && archivo.size <= b.size) ? archivo : b;
+}
+
 const inputArchivo = $('#archivo-img');
 let rutaSubida = null;
 
@@ -745,39 +845,23 @@ function refrescarCampoImagen(ruta){
 }
 
 async function subirImagen(archivo, ruta){
-  const base = apiBase();
-  if(!base){ aviso('Falta la dirección de la API, en «Catálogo desde Notion».'); return; }
   if(!/^image\//.test(archivo.type)){ aviso('Eso no es una imagen.'); return; }
-  if(archivo.size > 10 * 1024 * 1024){ aviso('La imagen pasa de 10 MB. Achicala antes.'); return; }
+  if(archivo.size > 40 * 1024 * 1024){ aviso('La imagen pasa de 40 MB.'); return; }
 
   const fld = panel.querySelector(`[data-fld="${ruta}"]`);
   if(fld) fld.classList.add('subiendo');
-  aviso('Subiendo ' + archivo.name + '…');
+  aviso('Preparando ' + archivo.name + '…');
 
   try{
-    const clave = leerLocal(CLAVE_SUBIDA, '') || '';
-    const cab = { 'Content-Type':'application/json' };
-    if(clave) cab['x-subida-token'] = clave;
-
-    const permiso = await fetch(base + '/api/subir', {
-      method:'POST', headers:cab,
-      body: JSON.stringify({ nombre:archivo.name, tipo:archivo.type, tamano:archivo.size })
-    });
-    const datos = await permiso.json().catch(()=>({}));
-    if(!permiso.ok) throw new Error(datos.error || 'La API no autorizó la subida.');
-
-    const puesta = await fetch(datos.urlSubida, {
-      method:'PUT', headers:{ 'Content-Type':archivo.type }, body:archivo
-    });
-    if(!puesta.ok) throw new Error('R2 rechazó el archivo. Revisá la regla CORS del bucket.');
-
-    fijar(D, ruta, datos.urlPublica);
+    const blob = await achicar(archivo);
+    if(blob.size > IMG_MAX_BYTES) throw new Error('La imagen sigue pasando de 3 MB. Probá con otra.');
+    fijar(D, ruta, await imagenes.guardar(blob));
     refrescarCampoImagen(ruta);
     pintarVista();
     apuntarGuardado();
-    aviso('Imagen subida');
+    aviso('Imagen lista');
   }catch(err){
-    aviso(explicarFalloDeRed(err));
+    aviso(String(err.message || err));
   }finally{
     const f2 = panel.querySelector(`[data-fld="${ruta}"]`);
     if(f2) f2.classList.remove('subiendo');
@@ -806,25 +890,6 @@ async function importarNotion(){
   }catch(err){
     aviso(explicarFalloDeRed(err));
   }
-}
-
-if(EN_VISOR){
-  const nota = document.createElement('p');
-  nota.className = 'empty';
-  nota.innerHTML = 'Estás en el visor de Claude, que bloquea las conexiones externas: '
-    + 'subir imágenes e importar de Notion funcionan en el <b>sitio publicado</b>.';
-  const ancla = $('#clave-subida');
-  if(ancla) ancla.closest('.rail-campo').before(nota);
-}
-
-/* clave opcional de subida: vive sólo en este navegador, nunca se exporta */
-const inputClave = $('#clave-subida');
-if(inputClave){
-  inputClave.value = leerLocal(CLAVE_SUBIDA, '') || '';
-  inputClave.addEventListener('change', ()=>{
-    escribirLocal(CLAVE_SUBIDA, inputClave.value.trim());
-    aviso(inputClave.value.trim() ? 'Clave de subida guardada en este navegador' : 'Clave de subida borrada');
-  });
 }
 
 /* =========================================================
@@ -898,12 +963,36 @@ function abrirPublicar(){
 
     btn.disabled = true; btn.textContent = 'Publicando…';
     try{
-      const r = await fetch(base + '/api/publicar', {
-        method:'POST',
-        headers:{ 'Content-Type':'application/json', 'x-publicar-token':clave },
-        body: JSON.stringify({ proyecto:nombre, html:renderDoc(TPL, D) })
-      });
-      const j = await r.json().catch(()=>({}));
+      const usadas = imagenes.usadas(D);
+      const perdidas = usadas.filter(n=>!imagenes.reg[n]);
+      if(perdidas.length) throw new Error(`Hay ${perdidas.length} imagen(es) que no están en este navegador. Volvé a subirlas o quitalas.`);
+      const archivos = usadas.map(n=>({ file:n, sha:imagenes.reg[n].sha, size:imagenes.reg[n].blob.size }));
+
+      const enviar = async cuerpo => {
+        const r = await fetch(base + '/api/publicar', {
+          method:'POST',
+          headers:{ 'Content-Type':'application/json', 'x-publicar-token':clave },
+          body: JSON.stringify(cuerpo)
+        });
+        return { r, j: await r.json().catch(()=>({})) };
+      };
+      const cuerpo = { proyecto:nombre, html:renderDoc(TPL, D), archivos };
+      let { r, j } = await enviar(cuerpo);
+
+      // Vercel pide sólo las imágenes que todavía no tiene; se suben de a una y se reintenta.
+      if(r.status === 409 && Array.isArray(j.faltanArchivos)){
+        const porSha = Object.fromEntries(archivos.map(a=>[a.sha, imagenes.reg[a.file]]));
+        for(const [i, sha] of j.faltanArchivos.entries()){
+          btn.textContent = `Subiendo imagen ${i + 1} de ${j.faltanArchivos.length}…`;
+          const reg = porSha[sha];
+          if(!reg) continue;
+          const datos = (await aDataURL(reg.blob)).split(',')[1];
+          const x = await enviar({ subir:{ sha, datos } });
+          if(!x.r.ok) throw new Error(x.j.error || 'No se pudo subir una imagen.');
+        }
+        btn.textContent = 'Publicando…';
+        ({ r, j } = await enviar(cuerpo));
+      }
       if(!r.ok) throw new Error([j.error || 'Vercel no respondió.', j.vercel, j.faltan && j.faltan.join(', ')].filter(Boolean).join(' · '));
       D._demo = j.proyecto; D._demoUrl = j.url;
       apuntarGuardado();
@@ -924,3 +1013,4 @@ irA('vista');
 abrirRubro(RUBROS[0].id);
 aplicarZoom();
 almacen.init();
+imagenes.cargar().then(()=>{ pintarPanel(); pintarVista(); });
