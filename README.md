@@ -1,7 +1,7 @@
 # Taller de Páginas
 
 Editor de plantillas para armar páginas web por rubro. Elegís la categoría de tu
-negocio, editás los textos en un panel, ves el resultado en vivo y descargás un
+negocio, editás todo directamente sobre la página y la publicás o descargás como un
 archivo `index.html` autónomo listo para subir a cualquier hosting.
 
 El contenido de arranque está pensado para negocios paraguayos: precios en
@@ -27,24 +27,35 @@ facturación a RUC y medios de pago locales (Tigo Money, Billetera Personal, Zim
 | Eventos | Salón de fiestas, organización |
 | Turismo y hotelería | Hotel, posada, excursiones |
 
-## Edición directa sobre la página
+## Todo se edita sobre la página
 
-No hace falta buscar el campo en un formulario: **se toca el texto en la misma
-página y se escribe encima**. Al elegir algo:
+No hay panel de campos: la página misma es el editor.
 
-- el texto queda editable en el lugar y el panel salta al campo que le corresponde;
-- si es parte de una lista (un producto, un renglón de precios, un paso), aparece
-  una barra flotante para subirlo, bajarlo, duplicarlo o quitarlo;
-- si es una imagen, la barra permite quitarla y volver al fondo generado.
+- **Textos**: se tocan y se escribe encima. Los campos vacíos muestran su nombre
+  en gris, así se pueden completar aunque no tengan nada.
+- **Imágenes**: al tocarlas aparece *Cambiar foto*; también se puede soltar una
+  foto encima.
+- **Botones y enlaces**: el texto se edita en el lugar y 🔗 cambia adónde llevan.
+- **Ítems de una lista** (productos, renglones, pasos, cifras, fotos): al elegir
+  uno aparece una barra para moverlo arrastrando **⠿**, subirlo, bajarlo,
+  duplicarlo o quitarlo.
+- **Secciones**: al pasar el mouse (o tocar el fondo en pantallas táctiles)
+  aparece su barra: **⠿** para arrastrarla, el estilo (las portadas y el catálogo
+  tienen variantes), **＋ Ítem**, **Datos** con todos sus campos (el WhatsApp, la
+  dirección, Notion…) y **✕** para quitarla. El **＋ Sección** del borde de abajo
+  agrega una nueva justo ahí.
+- **Estilo**, arriba: colores, tipografía, tamaño del texto, esquinas y aire.
+- **Deshacer** con el botón o con Ctrl/Cmd + Z.
 
-El panel también funciona al revés: al enfocar un campo, la página se desplaza y
-resalta el elemento correspondiente.
+Cada página guarda su propia lista de secciones (`_secciones`), así que dos demos
+del mismo rubro pueden tener secciones distintas. Una sección quitada conserva
+sus datos: si se vuelve a agregar, aparece como estaba.
 
 El botón **Previsualizar** apaga la edición y deja la página como la ve un
 visitante, con los enlaces y las preguntas desplegables funcionando.
 
-Las marcas que hacen posible todo esto (`data-campo`, `data-item`) existen sólo en
-la vista previa. El HTML exportado sale sin ellas.
+Las marcas que hacen posible todo esto (`data-campo`, `data-item`, `data-sec`)
+existen sólo en la vista previa. El HTML exportado sale sin ellas.
 
 ## Controles visuales
 
@@ -57,8 +68,9 @@ la vista previa. El HTML exportado sale sin ellas.
 
 Una plantilla no es un archivo HTML suelto: es una **lista de secciones** más su
 contenido. Las secciones (`js/secciones.js`) son piezas reutilizables — barra,
-portada, cifras, catálogo, lista de precios, pasos, preguntas, testimonios,
-contacto, pie — y cada una declara qué campos muestra en el panel de edición.
+portada, cifras, catálogo, galería, lista de precios, pasos, preguntas,
+testimonios, contacto, pie — y cada una declara sus campos y un contenido
+genérico (`nuevo`) para cuando se agrega a un rubro que no la traía.
 Agregar un rubro nuevo es agregar un objeto en `js/rubros.js`: qué secciones usa,
 con qué paleta y con qué contenido arranca.
 

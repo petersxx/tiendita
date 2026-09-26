@@ -38,6 +38,7 @@
   <input id="proj-name" class="proj-name" type="text" value="Mi página sin título" aria-label="Nombre del proyecto">
   <div class="top-actions">
     <button class="btn ghost" id="btn-tema" type="button" title="Claro u oscuro" aria-label="Cambiar entre tema claro y oscuro">◐</button>
+    <button class="btn" id="btn-estilo" type="button">Estilo</button>
     <button class="btn" id="btn-save" type="button">Guardar</button>
     <button class="btn" id="btn-code" type="button"><span class="label">Ver </span>HTML</button>
     <button class="btn" id="btn-export" type="button">Exportar</button>
@@ -52,7 +53,15 @@
     <div class="rail-h">Mis proyectos <button class="btn ghost tiny" id="btn-new" type="button">+ Nuevo</button></div>
     <div id="proj-list"></div>
     <div class="rail-h" style="margin-top:22px">Cómo se edita</div>
-    <p class="empty">Tocá cualquier texto <b>en la página</b> y escribí encima. Al elegir un ítem repetido aparece una barra para subirlo, duplicarlo o quitarlo.</p>
+    <p class="empty">Todo se edita <b>sobre la página</b>:</p>
+    <ul class="ayuda">
+      <li>Tocá un texto y escribí encima.</li>
+      <li>Tocá una imagen para cambiarla, o arrastrá una foto encima.</li>
+      <li>Pasá el mouse por una sección para moverla, cambiarle el estilo o quitarla.</li>
+      <li>Arrastrá <b>⠿</b> para mover secciones, productos o renglones.</li>
+      <li><b>＋</b> agrega una sección nueva.</li>
+      <li><b>Ctrl/Cmd + Z</b> deshace.</li>
+    </ul>
     <div class="rail-h" style="margin-top:22px">Dónde se guarda</div>
     <p class="empty" id="store-note">Comprobando…</p>
   </aside>
@@ -74,6 +83,7 @@
         <button type="button" id="zoom-mas" aria-label="Agrandar" title="Agrandar">+</button>
         <button type="button" id="zoom-ajustar" class="ajustar" title="Ajustar a la ventana">Ajustar</button>
       </div>
+      <button class="btn tiny" id="btn-deshacer" type="button" title="Deshacer (Ctrl/Cmd + Z)" disabled>↶ Deshacer</button>
       <span class="dims" id="dims">1280 px de ancho</span>
     </div>
     <div class="canvas" id="canvas">
@@ -82,25 +92,40 @@
       </div>
     </div>
   </section>
-
-  <aside class="pane panel" id="panel"></aside>
 </div>
 
 <nav class="tabbar" role="group" aria-label="Secciones">
   <button type="button" data-tab="plantillas" aria-pressed="false">Plantillas</button>
-  <button type="button" data-tab="editar" aria-pressed="false">Editar</button>
   <button type="button" data-tab="vista" aria-pressed="true">Vista</button>
 </nav>
 
 <input type="file" id="archivo-img" accept="image/png,image/jpeg,image/webp,image/avif,image/gif,image/svg+xml" hidden>
 
 <div class="barra-lienzo" id="barra-lienzo" hidden role="toolbar" aria-label="Acciones del elemento elegido">
+  <button type="button" data-bact="mover" class="asa" title="Arrastrá para mover" aria-label="Mover">⠿</button>
+  <button type="button" data-bact="link" title="Destino del enlace" aria-label="Destino del enlace">🔗</button>
   <button type="button" data-bact="up"   title="Subir" aria-label="Subir">↑</button>
   <button type="button" data-bact="down" title="Bajar" aria-label="Bajar">↓</button>
   <button type="button" data-bact="dup"  title="Duplicar" aria-label="Duplicar">⧉</button>
-  <button type="button" data-bact="img"  title="Subir imagen" aria-label="Subir imagen">↑︎⌗</button>
+  <button type="button" data-bact="img"  title="Cambiar la imagen" aria-label="Cambiar la imagen">Cambiar foto</button>
   <button type="button" data-bact="imgq" title="Quitar imagen" aria-label="Quitar imagen">⊘</button>
   <button type="button" data-bact="rm" class="rm" title="Quitar" aria-label="Quitar">✕</button>
+</div>
+
+<div class="barra-seccion" id="barra-seccion" hidden role="toolbar" aria-label="Acciones de la sección">
+  <button type="button" data-sact="mover" class="asa" title="Arrastrá para mover la sección" aria-label="Mover sección">⠿</button>
+  <b id="sec-nombre"></b>
+  <select id="sec-variante" aria-label="Estilo de la sección" hidden></select>
+  <button type="button" data-sact="item" title="Agregar un ítem a esta sección">＋ Ítem</button>
+  <button type="button" data-sact="datos" title="Todos los datos de esta sección">Datos</button>
+  <button type="button" data-sact="rm" class="rm" title="Quitar la sección" aria-label="Quitar la sección">✕</button>
+</div>
+<button type="button" class="mas-seccion" id="mas-seccion" hidden title="Agregar una sección acá">＋ Sección</button>
+<div class="guia-arrastre" id="guia-arrastre" hidden></div>
+
+<div class="pop" id="pop" hidden role="dialog" aria-labelledby="pop-t">
+  <div class="pop-h"><b id="pop-t"></b><button class="btn ghost tiny" type="button" id="pop-cerrar" aria-label="Cerrar">✕</button></div>
+  <div class="pop-b" id="panel"></div>
 </div>
 
 <div class="toast" id="toast" role="status" aria-live="polite"></div>

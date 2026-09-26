@@ -192,6 +192,12 @@ p:last-child{margin-bottom:0}
 .dueto h2{font-size:calc(clamp(24px,3.8vw,36px)*var(--esc));margin-bottom:.55em}
 .dueto .texto{color:${t.mudo};font-size:16px}
 
+/* galería */
+.galeria{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:clamp(10px,1.6vw,16px)}
+.galeria figure{margin:0}
+.galeria .arte,.galeria img{width:100%;aspect-ratio:1/1;object-fit:cover;border-radius:var(--rad)}
+.galeria figcaption{font-size:13.5px;color:${t.mudo};margin-top:8px}
+
 /* preguntas */
 .faq{max-width:760px;border-top:1px solid ${t.linea}}
 .faq details{border-bottom:1px solid ${t.linea}}

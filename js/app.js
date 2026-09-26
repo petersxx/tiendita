@@ -5,6 +5,8 @@ const $ = s => document.querySelector(s);
 const panel = $('#panel'), preview = $('#preview'), inpNombre = $('#proj-name');
 const listaTpl = $('#tpl-list'), listaProj = $('#proj-list'), notaAlmacen = $('#store-note');
 const canvas = $('#canvas'), marco = $('#marco'), envoltorio = $('#marco-wrap'), barra = $('#barra-lienzo');
+const pop = $('#pop'), barraSec = $('#barra-seccion'), masSec = $('#mas-seccion'), guia = $('#guia-arrastre');
+const btnDeshacer = $('#btn-deshacer');
 
 let TPL = RUBROS[0];
 let D = clonar(TPL.d);
@@ -16,6 +18,8 @@ let dispositivo = 'escritorio';
 let zoom = 1, zoomAuto = true;
 let seleccion = null;             // ruta del campo seleccionado en la página
 let itemActual = null;            // ítem repetible que lo contiene, ej. "cards.2"
+let secActual = null;             // índice de la sección bajo el mouse
+let popCampos = null;             // lo que muestra la hoja flotante; null = cerrada
 let tPrev, tGuard;
 
 const ANCHOS = { escritorio:1280, tablet:820, movil:390 };
@@ -41,9 +45,51 @@ function fijar(obj, ruta, valor){
 }
 function obtener(obj, ruta){ return ruta.split('.').reduce((o,k)=> (o==null?o:o[k]), obj); }
 
-function camposVisibles(){
-  return camposDe(TPL).filter(c => c.k !== '_cardStyle' || TPL.secciones.includes('cards'));
+function camposVisibles(){ return camposDe(seccionesDe(TPL, D)); }
+
+/* completa los datos que una sección necesita y todavía no están:
+   primero el contenido del rubro, si no el genérico de la sección */
+function completarDatos(nombre){
+  const s = SEC[nombre]; if(!s) return;
+  const base = (s.familia === 'hero' ? SEC.heroSplit.nuevo : s.nuevo) || {};
+  camposSeccion(nombre).forEach(c=>{
+    if(D[c.k] === undefined) D[c.k] = clonar(TPL.d[c.k] ?? base[c.k] ?? ESTILO_POR_DEFECTO[c.k] ?? (c.t==='lista' ? [] : c.t==='check' ? false : ''));
+  });
 }
+function prepararDatos(datos){
+  D = Object.assign({}, ESTILO_POR_DEFECTO, clonar(datos));
+  if(!Array.isArray(D._secciones)) D._secciones = [...TPL.secciones];
+  D._secciones.forEach(completarDatos);
+  CAMPOS_ESTILO.forEach(c=>{ if(D[c.k] === undefined) D[c.k] = clonar(TPL.d[c.k] ?? ESTILO_POR_DEFECTO[c.k] ?? ''); });
+  historial.length = 0; btnDeshacer.disabled = true;
+}
+
+/* ---------- deshacer: una foto de los datos antes de cada cambio ---------- */
+const historial = [];
+function recordar(){
+  const foto = JSON.stringify(D);
+  if(historial[historial.length-1] !== foto){ historial.push(foto); if(historial.length > 80) historial.shift(); }
+  btnDeshacer.disabled = false;
+}
+function deshacer(){
+  const foto = historial.pop();
+  btnDeshacer.disabled = !historial.length;
+  if(!foto){ aviso('No hay nada para deshacer'); return; }
+  D = JSON.parse(foto);
+  limpiarSeleccion();
+  pintarPanel(); pintarVista(); apuntarGuardado();
+  aviso('Deshecho');
+}
+function escribiendo(el){
+  return !!el && (el.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName));
+}
+function teclaDeshacer(ev){
+  if(!(ev.metaKey || ev.ctrlKey) || ev.shiftKey || ev.key.toLowerCase() !== 'z') return;
+  if(escribiendo(ev.target)) return;           // dentro de un texto, deshace el navegador
+  ev.preventDefault(); deshacer();
+}
+document.addEventListener('keydown', teclaDeshacer);
+btnDeshacer.addEventListener('click', deshacer);
 function defCampo(ruta){
   const seg = ruta.split('.');
   const c = camposVisibles().find(x => x.k === seg[0]);
@@ -137,15 +183,33 @@ function itemHTML(c, ruta, i){
   </div>`;
 }
 
+/* =========================================================
+   HOJA FLOTANTE — datos de una sección, estilo, enlaces
+   ========================================================= */
+function abrirPop(titulo, contenido){
+  popCampos = contenido;
+  $('#pop-t').textContent = titulo;
+  pop.hidden = false;
+  pintarPanel();
+  panel.scrollTop = 0;
+}
+function cerrarPop(){ pop.hidden = true; popCampos = null; panel.innerHTML = ''; }
+$('#pop-cerrar').addEventListener('click', cerrarPop);
+document.addEventListener('keydown', e=>{ if(e.key === 'Escape' && !pop.hidden) cerrarPop(); });
+
 function pintarPanel(){
+  if(!popCampos) return;
+  if(typeof popCampos === 'function'){ panel.innerHTML = popCampos(); return; }
   const grupos = [];
-  camposVisibles().forEach(c=>{
+  popCampos.forEach(c=>{
     let g = grupos.find(x=>x.n===c.g);
     if(!g){ g = {n:c.g, cs:[]}; grupos.push(g); }
     g.cs.push(c);
   });
-  panel.innerHTML = grupos.map((g,i)=>`
-    <details class="grp"${i<2?' open':''}>
+  const uno = grupos.length === 1;
+  panel.innerHTML = grupos.map((g,i)=> uno
+    ? `<div class="grp-body">${g.cs.map(c=>campoHTML(c, c.k)).join('')}</div>`
+    : `<details class="grp"${i===0?' open':''}>
       <summary>${esc(g.n)}</summary>
       <div class="grp-body">${g.cs.map(c=>campoHTML(c, c.k)).join('')}</div>
     </details>`).join('');
@@ -184,6 +248,7 @@ panel.addEventListener('input', e=>{
 /* ---------- el panel enfoca lo que corresponde en la página ---------- */
 panel.addEventListener('focusin', e=>{
   const ruta = e.target.dataset && e.target.dataset.path;
+  if(ruta) recordar();
   if(!ruta || modo !== 'editar') return;
   const doc = docVista(); if(!doc) return;
   const el = doc.querySelector(`[data-campo="${ruta}"]`) || doc.querySelector(`[data-campo-img="${ruta}"]`);
@@ -212,6 +277,9 @@ panel.addEventListener('click', e=>{
   const accion = e.target.closest('[data-accion]');
   if(accion){ if(accion.dataset.accion === 'importarNotion') importarNotion(); return; }
 
+  const nueva = e.target.closest('[data-nueva-sec]');
+  if(nueva){ agregarSeccion(nueva.dataset.nuevaSec, Number(nueva.dataset.pos)); return; }
+
   const b = e.target.closest('button[data-act]');
   if(!b) return;
   accionLista(b.dataset.key, b.dataset.act, Number(b.dataset.i));
@@ -238,6 +306,7 @@ panel.addEventListener('drop', e=>{
 function accionLista(ruta, acto, i){
   const c = camposVisibles().find(x=>x.k===ruta.split('.')[0]);
   const arr = obtener(D, ruta);
+  recordar();
   if(acto==='add')  arr.push(clonar(c.nuevo));
   if(acto==='dup')  arr.splice(i+1,0,clonar(arr[i]));
   if(acto==='rm')   arr.splice(i,1);
@@ -270,6 +339,8 @@ function pintarVista(){
     try{ preview.contentWindow.scrollTo(0,y); }catch(e){}
     conectarLienzo();
     if(seleccion) restaurarSeleccion();
+    if(irASeccion != null){ enfocarSeccion(irASeccion); irASeccion = null; }
+    else if(secActual != null) mostrarSeccion(secActual);
   };
   preview.srcdoc = renderDoc(TPL, conImagenesLocales(D), modo === 'editar');
 }
@@ -278,13 +349,43 @@ function pintarVista(){
 const REHACER = /^(marca|whatsapp|telefono|email|mapaUrl|instagram|ciudad|heroCtaUrl)$|\.seccion$|^navLinks\.\d+\.url$/;
 
 function conectarLienzo(){
-  const doc = docVista(); if(!doc || modo !== 'editar') return;
+  const doc = docVista(); if(!doc || modo !== 'editar'){ ocultarSeccion(); return; }
+
+  // lo que se ve en un campo vacío: el nombre del campo
+  doc.querySelectorAll('[data-campo]').forEach(el=>{
+    const c = defCampo(el.dataset.campo);
+    el.dataset.vacio = c ? c.l : 'Escribí acá';
+  });
 
   // habilitar la escritura en el mismo mousedown deja el cursor donde se hizo clic
   doc.addEventListener('mousedown', ev=>{
     const el = ev.target.closest && ev.target.closest('[data-campo]');
-    if(el && el.contentEditable !== 'true'){ el.contentEditable = 'true'; el.spellcheck = false; }
+    if(el && el.contentEditable !== 'true'){ recordar(); el.contentEditable = 'true'; el.spellcheck = false; }
   }, true);
+
+  doc.addEventListener('mousemove', ev=>{
+    if(arrastre) return;
+    const sec = ev.target.closest && ev.target.closest('[data-sec]');
+    if(sec && Number(sec.dataset.sec) !== secActual) mostrarSeccion(Number(sec.dataset.sec));
+  });
+
+  // soltar una foto sobre una imagen la reemplaza; en cualquier otro lado no hace nada
+  doc.addEventListener('dragover', ev=>{
+    ev.preventDefault();
+    doc.querySelectorAll('.tp-soltar').forEach(x=>x.classList.remove('tp-soltar'));
+    const img = ev.target.closest && ev.target.closest('[data-campo-img]');
+    if(img) img.classList.add('tp-soltar');
+    ev.dataTransfer.dropEffect = img ? 'copy' : 'none';
+  });
+  doc.addEventListener('drop', ev=>{
+    ev.preventDefault();
+    doc.querySelectorAll('.tp-soltar').forEach(x=>x.classList.remove('tp-soltar'));
+    const img = ev.target.closest && ev.target.closest('[data-campo-img]');
+    const archivo = ev.dataTransfer && ev.dataTransfer.files && ev.dataTransfer.files[0];
+    if(img && archivo) subirImagen(archivo, img.dataset.campoImg);
+    else if(archivo) aviso('Soltala encima de una imagen de la página');
+  });
+  doc.addEventListener('keydown', teclaDeshacer);
 
   doc.addEventListener('click', ev=>{
     const enlace = ev.target.closest && ev.target.closest('a');
@@ -295,6 +396,9 @@ function conectarLienzo(){
     if(txt){ elegir(txt, txt.dataset.campo); return; }
     if(img){ elegir(img, img.dataset.campoImg); return; }
     limpiarSeleccion();
+    // tocar el fondo de una sección la elige (en pantallas táctiles no hay mouse encima)
+    const sec = ev.target.closest && ev.target.closest('[data-sec]');
+    if(sec) mostrarSeccion(Number(sec.dataset.sec));
   }, true);
 
   doc.addEventListener('input', ev=>{
@@ -327,7 +431,7 @@ function conectarLienzo(){
   }, true);
 
   const w = doc.defaultView;
-  if(w) w.addEventListener('scroll', colocarBarra, {passive:true});
+  if(w) w.addEventListener('scroll', ()=>{ colocarBarra(); colocarSeccion(); }, {passive:true});
 }
 
 function elegir(el, ruta){
@@ -394,13 +498,16 @@ function mostrarBarra(el){
   const item = el.closest('[data-item]');
   const esImg = !!el.dataset.campoImg;
   itemActual = item ? item.dataset.item : null;
-  if(!item && !esImg){ ocultarBarra(); return; }
   barra.hidden = false;
   barra.style.visibility = 'visible';
   const deImagen = new Set(['img','imgq']);
+  const def = !esImg && defCampo(el.dataset.campo);
+  if(!item && !esImg && !(def && def.enlace)){ ocultarBarra(); return; }
   barra.querySelectorAll('[data-bact]').forEach(b=>{
     if(deImagen.has(b.dataset.bact)){
       b.hidden = !esImg || (b.dataset.bact === 'imgq' && !obtener(D, el.dataset.campoImg));
+    } else if(b.dataset.bact === 'link'){
+      b.hidden = !(def && def.enlace);
     } else {
       b.hidden = !item;
     }
@@ -435,8 +542,11 @@ function colocarBarra(){
 barra.addEventListener('click', e=>{
   const b = e.target.closest('[data-bact]'); if(!b) return;
   const acto = b.dataset.bact;
+  if(acto === 'mover') return;                   // se maneja con el arrastre
+  if(acto === 'link'){ editarEnlace(seleccion); return; }
   if(acto === 'img'){ pedirArchivo(seleccion); return; }
   if(acto === 'imgq'){
+    recordar();
     fijar(D, seleccion, '');
     refrescarCampoImagen(seleccion);
     pintarVista(); apuntarGuardado();
@@ -446,6 +556,251 @@ barra.addEventListener('click', e=>{
   const p = itemActual.lastIndexOf('.');
   accionLista(itemActual.slice(0,p), acto, Number(itemActual.slice(p+1)));
   pintarPanel(); pintarVista();
+});
+
+/* ---------- destino de un botón o enlace ---------- */
+function editarEnlace(ruta){
+  const def = defCampo(ruta); if(!def || !def.enlace) return;
+  const seg = ruta.split('.');
+  const rutaUrl = seg.length > 1 ? [...seg.slice(0,-1), def.enlace].join('.') : def.enlace;
+  abrirPop('Destino del enlace', [{
+    k: rutaUrl, g:'Enlace', t:'text', l:'Adónde lleva',
+    pista:'Una sección de la página (#contacto, #catalogo, #precios, #galeria) o una dirección web completa.',
+  }]);
+  const inp = panel.querySelector('input'); if(inp){ inp.focus(); inp.select(); }
+}
+
+/* =========================================================
+   SECCIONES: barra, agregar, quitar, variantes
+   ========================================================= */
+let irASeccion = null;
+
+function listaDeSeccion(nombre){ return camposSeccion(nombre).find(c => c.t === 'lista'); }
+
+function mostrarSeccion(i){
+  const doc = docVista(); if(!doc || modo !== 'editar'){ ocultarSeccion(); return; }
+  const el = doc.querySelector(`[data-sec="${i}"]`);
+  const nombre = D._secciones[i];
+  if(!el || !SEC[nombre]){ ocultarSeccion(); return; }
+  doc.querySelectorAll('.sec-hover').forEach(x=>x.classList.remove('sec-hover'));
+  el.classList.add('sec-hover');
+  secActual = i;
+  const s = SEC[nombre];
+  $('#sec-nombre').textContent = s.nombre;
+  const sel = $('#sec-variante');
+  if(s.familia === 'hero'){
+    sel.innerHTML = VARIANTES_PORTADA.map(v=>`<option value="${v}"${v===nombre?' selected':''}>${esc(SEC[v].variante)}</option>`).join('');
+    sel.hidden = false;
+  }else if(s.variantes){
+    const actual = D[s.variantes.campo];
+    sel.innerHTML = s.variantes.opts.map(o=>`<option value="${esc(o.v)}"${o.v===actual?' selected':''}>${esc(o.l)}</option>`).join('');
+    sel.hidden = false;
+  }else sel.hidden = true;
+  const lista = listaDeSeccion(nombre);
+  barraSec.querySelector('[data-sact="item"]').hidden = !lista;
+  if(lista) barraSec.querySelector('[data-sact="item"]').textContent = '＋ ' + lista.add.replace(/^Agregar /,'');
+  barraSec.querySelector('[data-sact="datos"]').hidden = !camposSeccion(nombre).length;
+  barraSec.querySelector('[data-sact="mover"]').hidden = !!s.fija;
+  barraSec.hidden = false; masSec.hidden = false;
+  colocarSeccion();
+}
+function ocultarSeccion(){
+  barraSec.hidden = true; masSec.hidden = true; secActual = null;
+  const doc = docVista();
+  if(doc) doc.querySelectorAll('.sec-hover').forEach(x=>x.classList.remove('sec-hover'));
+}
+function colocarSeccion(){
+  if(barraSec.hidden || secActual == null) return;
+  const doc = docVista(); const el = doc && doc.querySelector(`[data-sec="${secActual}"]`);
+  if(!el){ ocultarSeccion(); return; }
+  const rc = canvas.getBoundingClientRect(), rm = marco.getBoundingClientRect(), re = el.getBoundingClientRect();
+  const arriba = rm.top + re.top * zoom, abajo = rm.top + re.bottom * zoom;
+  const izq = rm.left + re.left * zoom, der = rm.left + re.right * zoom;
+  const visible = abajo > rc.top + 10 && arriba < rc.bottom - 10;
+  barraSec.style.visibility = visible ? 'visible' : 'hidden';
+  const w = barraSec.offsetWidth, h = barraSec.offsetHeight;
+  // sobre el borde de arriba, a la derecha; si la sección ya subió, acompaña el borde del lienzo
+  const top = Math.min(Math.max(arriba - h / 2, rc.top + 6), abajo - h - 8);
+  barraSec.style.top = Math.round(top) + 'px';
+  barraSec.style.left = Math.round(Math.max(rc.left + 6, Math.min(der - w - 8, rc.right - w - 6))) + 'px';
+  // el ＋ va en el borde de abajo, al medio
+  const mh = masSec.offsetHeight, mw = masSec.offsetWidth;
+  const my = abajo - mh / 2;
+  masSec.style.visibility = (my > rc.top + 4 && my + mh < rc.bottom - 4) ? 'visible' : 'hidden';
+  masSec.style.top = Math.round(my) + 'px';
+  masSec.style.left = Math.round((izq + der) / 2 - mw / 2) + 'px';
+}
+function enfocarSeccion(i){
+  const doc = docVista(); const el = doc && doc.querySelector(`[data-sec="${i}"]`);
+  if(!el) return;
+  const w = doc.defaultView;
+  w.scrollTo({ top: w.scrollY + el.getBoundingClientRect().top - 40, behavior:'smooth' });
+  mostrarSeccion(i);
+  setTimeout(colocarSeccion, 450);
+}
+
+/* fuera del lienzo y de sus barras, la barra de sección se va */
+document.addEventListener('mousemove', e=>{
+  if(arrastre || barraSec.hidden) return;
+  if(!e.target.closest('#canvas,#barra-seccion,#mas-seccion,#barra-lienzo')) ocultarSeccion();
+});
+
+barraSec.addEventListener('click', e=>{
+  const b = e.target.closest('[data-sact]'); if(!b || secActual == null) return;
+  const i = secActual, nombre = D._secciones[i], acto = b.dataset.sact;
+  if(acto === 'datos'){
+    const campos = camposSeccion(nombre);
+    abrirPop(SEC[nombre].nombre, campos);
+    return;
+  }
+  if(acto === 'item'){
+    const lista = listaDeSeccion(nombre);
+    accionLista(lista.k, 'add');
+    pintarPanel();
+    aviso(lista.add.replace(/^Agregar /,'') + ' agregado al final');
+    return;
+  }
+  if(acto === 'rm'){
+    recordar();
+    D._secciones.splice(i, 1);
+    ocultarSeccion(); limpiarSeleccion();
+    tocar();
+    aviso(SEC[nombre].nombre + ' quitada · Ctrl/Cmd + Z para deshacer');
+  }
+});
+$('#sec-variante').addEventListener('change', e=>{
+  if(secActual == null) return;
+  const nombre = D._secciones[secActual], s = SEC[nombre];
+  recordar();
+  if(s.familia === 'hero') D._secciones[secActual] = e.target.value;
+  else if(s.variantes) D[s.variantes.campo] = e.target.value;
+  tocar();
+});
+
+masSec.addEventListener('click', ()=>{
+  if(secActual == null) return;
+  menuSecciones(secActual + 1);
+});
+
+function menuSecciones(pos){
+  const presentes = new Set(D._secciones.map(FAMILIA));
+  const libres = CATALOGO_SECCIONES.filter(n => !presentes.has(FAMILIA(n)));
+  const DESC = {
+    nav:'Nombre del negocio, menú y botón de contacto', heroSplit:'Titular grande, texto y botón',
+    tiras:'Tres o cuatro números que generan confianza', cards:'Productos o servicios con foto y precio',
+    galeria:'Fotos del local, de trabajos, del equipo', precios:'Renglones con precio, agrupables',
+    pasos:'Cómo se compra o se contrata, en orden', texto:'La historia del negocio con una foto',
+    testimonios:'Comentarios de clientes', faq:'Preguntas frecuentes desplegables',
+    contacto:'WhatsApp, dirección, horario y pagos', pie:'Cierre de la página',
+  };
+  abrirPop('Agregar sección', ()=> libres.length
+    ? `<div class="menu-secciones">${libres.map(n=>`<button type="button" data-nueva-sec="${n}" data-pos="${pos}">
+        <b>${esc(SEC[n].nombre)}</b><span>${esc(DESC[n]||'')}</span></button>`).join('')}</div>`
+    : `<p class="empty" style="padding:14px 16px">Ya están todas las secciones en la página.</p>`);
+}
+
+function agregarSeccion(nombre, pos){
+  recordar();
+  completarDatos(nombre);
+  if(SEC[nombre].fija === 'arriba') pos = 0;
+  if(SEC[nombre].fija === 'abajo') pos = D._secciones.length;
+  // nada entra antes de la barra ni después del pie
+  if(SEC[D._secciones[0]]?.fija === 'arriba') pos = Math.max(pos, 1);
+  const ult = D._secciones.length - 1;
+  if(SEC[nombre].fija !== 'abajo' && SEC[D._secciones[ult]]?.fija === 'abajo') pos = Math.min(pos, ult);
+  D._secciones.splice(pos, 0, nombre);
+  cerrarPop();
+  irASeccion = pos;
+  tocar();
+  aviso(SEC[nombre].nombre + ' agregada');
+}
+
+/* =========================================================
+   ARRASTRAR PARA MOVER — secciones e ítems
+   La manija vive fuera del iframe; con el puntero capturado,
+   seguimos el movimiento aunque pase por encima de la página.
+   ========================================================= */
+let arrastre = null;
+
+function empezarArrastre(tipo, ev){
+  const doc = docVista(); if(!doc) return;
+  let els, desde, lista;
+  if(tipo === 'sec'){
+    if(secActual == null) return;
+    els = [...doc.querySelectorAll('[data-sec]')].filter(e => !SEC[D._secciones[+e.dataset.sec]]?.fija);
+    desde = secActual;
+  }else{
+    if(!itemActual) return;
+    const p = itemActual.lastIndexOf('.');
+    lista = itemActual.slice(0, p); desde = Number(itemActual.slice(p + 1));
+    const re = new RegExp('^' + lista.replace(/\./g,'\\.') + '\\.\\d+$');
+    els = [...doc.querySelectorAll('[data-item]')].filter(e => re.test(e.dataset.item));
+  }
+  if(els.length < 2){ aviso('No hay con qué intercambiarlo'); return; }
+  ev.preventDefault();
+  ev.target.setPointerCapture(ev.pointerId);
+  const origen = els.find(e => indice(e) === desde);
+  if(origen) origen.setAttribute('data-arrastrando', '');
+  arrastre = { tipo, desde, lista, els, destino:null, origen };
+  document.body.style.cursor = 'grabbing';
+}
+function indice(el){
+  return el.dataset.sec != null && el.dataset.item == null ? Number(el.dataset.sec) : Number(el.dataset.item.split('.').pop());
+}
+function moverArrastre(ev){
+  if(!arrastre) return;
+  const rm = marco.getBoundingClientRect(), rc = canvas.getBoundingClientRect();
+  const x = (ev.clientX - rm.left) / zoom, y = (ev.clientY - rm.top) / zoom;
+  // cerca de los bordes, la página se desplaza sola
+  const w = preview.contentWindow;
+  if(ev.clientY < rc.top + 50) w.scrollBy(0, -18);
+  else if(ev.clientY > rc.bottom - 50) w.scrollBy(0, 18);
+
+  let mejor = null, dmin = Infinity;
+  const rects = arrastre.els.map(e => ({ e, r:e.getBoundingClientRect() }));
+  rects.forEach(o=>{
+    const cx = o.r.left + o.r.width/2, cy = o.r.top + o.r.height/2;
+    const d = Math.hypot(Math.max(0, Math.abs(x - cx) - o.r.width/2), Math.max(0, Math.abs(y - cy) - o.r.height/2));
+    if(d < dmin || (d === dmin && Math.hypot(x-cx, y-cy) < mejor.dc)){ dmin = d; mejor = { ...o, dc:Math.hypot(x-cx, y-cy) }; }
+  });
+  if(!mejor) return;
+  const r = mejor.r;
+  const enFila = rects.some(o => o.e !== mejor.e && Math.abs(o.r.top - r.top) < 4);
+  const despues = enFila ? x > r.left + r.width/2 : y > r.top + r.height/2;
+  arrastre.destino = indice(mejor.e) + (despues ? 1 : 0);
+
+  guia.hidden = false;
+  if(enFila){
+    const gx = rm.left + (despues ? r.right : r.left) * zoom;
+    Object.assign(guia.style, { left:(gx - 2)+'px', top:(rm.top + r.top*zoom)+'px', width:'4px', height:(r.height*zoom)+'px' });
+  }else{
+    const gy = rm.top + (despues ? r.bottom : r.top) * zoom;
+    Object.assign(guia.style, { left:(rm.left + r.left*zoom)+'px', top:(gy - 2)+'px', width:(r.width*zoom)+'px', height:'4px' });
+  }
+}
+function terminarArrastre(){
+  if(!arrastre) return;
+  const { tipo, desde, lista, destino, origen } = arrastre;
+  arrastre = null; guia.hidden = true; document.body.style.cursor = '';
+  if(origen) origen.removeAttribute('data-arrastrando');
+  if(destino == null || destino === desde || destino === desde + 1) return;
+  recordar();
+  const arr = tipo === 'sec' ? D._secciones : obtener(D, lista);
+  const [x] = arr.splice(desde, 1);
+  const pos = destino > desde ? destino - 1 : destino;
+  arr.splice(pos, 0, x);
+  limpiarSeleccion();
+  if(tipo === 'sec'){ secActual = pos; irASeccion = null; }
+  pintarPanel(); tocar();
+}
+[barra, barraSec].forEach(b=>{
+  b.addEventListener('pointerdown', ev=>{
+    const asa = ev.target.closest('.asa'); if(!asa) return;
+    empezarArrastre(b === barraSec ? 'sec' : 'item', ev);
+  });
+  b.addEventListener('pointermove', moverArrastre);
+  b.addEventListener('pointerup', terminarArrastre);
+  b.addEventListener('pointercancel', terminarArrastre);
 });
 
 /* =========================================================
@@ -465,7 +820,7 @@ function aplicarZoom(){
   envoltorio.style.height = Math.round(H * zoom) + 'px';
   $('#zoom-val').textContent = Math.round(zoom * 100) + '%';
   $('#dims').textContent = W + ' px de ancho';
-  colocarBarra();
+  colocarBarra(); colocarSeccion();
 }
 function fijarZoom(z, auto){ zoomAuto = !!auto; if(!auto) zoom = z; aplicarZoom(); }
 
@@ -473,7 +828,7 @@ $('#zoom-menos').addEventListener('click', ()=> fijarZoom(Math.round((zoom - .1)
 $('#zoom-mas').addEventListener('click',   ()=> fijarZoom(Math.round((zoom + .1)*100)/100, false));
 $('#zoom-ajustar').addEventListener('click', ()=> fijarZoom(0, true));
 addEventListener('resize', ()=>{ aplicarZoom(); });
-canvas.addEventListener('scroll', colocarBarra, {passive:true});
+canvas.addEventListener('scroll', ()=>{ colocarBarra(); colocarSeccion(); }, {passive:true});
 
 document.querySelectorAll('[data-device]').forEach(b=>{
   b.addEventListener('click', ()=>{
@@ -488,7 +843,7 @@ document.querySelectorAll('[data-modo]').forEach(b=>{
   b.addEventListener('click', ()=>{
     document.querySelectorAll('[data-modo]').forEach(x=>x.setAttribute('aria-pressed', String(x===b)));
     modo = b.dataset.modo;
-    limpiarSeleccion();
+    limpiarSeleccion(); ocultarSeccion(); cerrarPop();
     pintarVista();
     aviso(modo === 'editar' ? 'Tocá cualquier texto de la página para escribir' : 'Modo visitante: los enlaces y las preguntas funcionan');
   });
@@ -513,12 +868,9 @@ listaTpl.addEventListener('click', e=>{
 
 function abrirRubro(id, datos, pid, nombre){
   TPL = RUBROS.find(r=>r.id===id) || RUBROS[0];
-  D = Object.assign({}, ESTILO_POR_DEFECTO, clonar(datos || leerBorrador(TPL.id) || TPL.d));
-  camposVisibles().forEach(c=>{
-    if(D[c.k] === undefined) D[c.k] = clonar(TPL.d[c.k] ?? ESTILO_POR_DEFECTO[c.k] ?? (c.t==='lista'?[]:''));
-  });
+  prepararDatos(datos || leerBorrador(TPL.id) || TPL.d);
   proyectoId = pid || null;
-  seleccion = null; ocultarBarra();
+  seleccion = null; ocultarBarra(); ocultarSeccion(); cerrarPop();
   inpNombre.value = nombre || (TPL.d.marca + ' — ' + TPL.rubro);
   pintarRubros(); pintarPanel(); pintarVista(); pintarProyectos();
 }
@@ -670,11 +1022,13 @@ function verCodigo(codigo, nota){
    CONTROLES GENERALES
    ========================================================= */
 $('#btn-save').addEventListener('click', ()=>guardar());
+$('#btn-estilo').addEventListener('click', ()=> pop.hidden || popCampos !== CAMPOS_ESTILO ? abrirPop('Estilo de la página', CAMPOS_ESTILO) : cerrarPop());
 $('#btn-export').addEventListener('click', exportar);
 $('#btn-code').addEventListener('click', async ()=>verCodigo(await htmlAutonomo()));
 $('#btn-new').addEventListener('click', ()=>{
   proyectoId = null;
-  D = Object.assign({}, ESTILO_POR_DEFECTO, clonar(TPL.d));
+  prepararDatos(TPL.d);
+  cerrarPop();
   inpNombre.value = TPL.d.marca + ' — ' + TPL.rubro;
   limpiarSeleccion();
   pintarPanel(); pintarVista(); pintarProyectos();
@@ -855,6 +1209,7 @@ async function subirImagen(archivo, ruta){
   try{
     const blob = await achicar(archivo);
     if(blob.size > IMG_MAX_BYTES) throw new Error('La imagen sigue pasando de 3 MB. Probá con otra.');
+    recordar();
     fijar(D, ruta, await imagenes.guardar(blob));
     refrescarCampoImagen(ruta);
     pintarVista();

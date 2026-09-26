@@ -7,12 +7,13 @@
    que la capa de edición usa para saber qué toca cada clic; al
    exportar devuelve cadenas vacías, así el HTML sale limpio.
    ========================================================= */
-const ANCLAS = { cards:'#catalogo', precios:'#precios', texto:'#nosotros', faq:'#preguntas', contacto:'#contacto' };
+const ANCLAS = { cards:'#catalogo', precios:'#precios', texto:'#nosotros', faq:'#preguntas', contacto:'#contacto', galeria:'#galeria' };
 
 function marcas(activo){
   const q = s => String(s).replace(/"/g,'&quot;');
-  if(!activo){ const nada = ()=> ''; return { c:nada, p:nada, im:nada, it:nada }; }
+  if(!activo){ const nada = ()=> ''; return { on:false, c:nada, p:nada, im:nada, it:nada }; }
   return {
+    on: true,                                            // en edición los campos vacíos igual se muestran
     c:  r => ` data-campo="${q(r)}"`,                    // texto de una línea
     p:  r => ` data-campo="${q(r)}" data-multi="1"`,     // texto de varios párrafos
     im: r => ` data-campo-img="${q(r)}"`,                // imagen o fondo generado
@@ -22,27 +23,33 @@ function marcas(activo){
 
 const SEC = {
   nav: {
+    nombre:'Barra de menú', fija:'arriba',
+    nuevo:{ navCta:'Escribinos', navLinks:[{txt:'Contacto',url:'#contacto'}] },
     campos:[
       {k:'marca',   g:'Identidad', l:'Nombre del negocio', t:'text'},
       {k:'navCta',  g:'Identidad', l:'Botón de la barra',  t:'text'},
       {k:'navLinks',g:'Identidad', l:'Enlaces del menú',   t:'lista', add:'Agregar enlace',
         nuevo:{txt:'Sección', url:'#'},
-        item:[{k:'txt',l:'Texto',t:'text'},{k:'url',l:'Destino',t:'text'}]},
+        item:[{k:'txt',l:'Texto',t:'text',enlace:'url'},{k:'url',l:'Destino',t:'text'}]},
     ],
     html:(d,t,a)=>`
 <header class="nav"><div class="wrap">
   <a class="marca" href="#"${a.c('marca')}>${esc(d.marca)}</a>
-  <nav class="nav-links">${(d.navLinks||[]).map((l,i)=>`<a href="${esc(l.url)}"${a.c(`navLinks.${i}.txt`)}>${esc(l.txt)}</a>`).join('')}</nav>
+  <nav class="nav-links">${(d.navLinks||[]).map((l,i)=>`<a href="${esc(l.url)}"${a.c(`navLinks.${i}.txt`)}${a.it(`navLinks.${i}`)}>${esc(l.txt)}</a>`).join('')}</nav>
   <a class="btn" href="${wa(d.whatsapp,'Hola '+d.marca+', vi su página y quiero consultar.')}"${a.c('navCta')}>${esc(d.navCta)}</a>
 </div></header>`
   },
 
   heroSplit: {
+    nombre:'Portada', familia:'hero', variante:'Imagen al costado',
+    nuevo:{ heroEyebrow:'Bienvenidos', heroTitulo:'Un titular que diga qué hacés y para quién',
+      heroTexto:'Una o dos oraciones que expliquen por qué elegirte: qué ofrecés, dónde y cómo se compra.',
+      heroCta:'Escribinos', heroCtaUrl:'#contacto', heroImg:'' },
     campos:[
       {k:'heroEyebrow',g:'Portada',l:'Bajada corta',t:'text'},
       {k:'heroTitulo', g:'Portada',l:'Titular',t:'textarea'},
       {k:'heroTexto',  g:'Portada',l:'Párrafo de apertura',t:'textarea'},
-      {k:'heroCta',    g:'Portada',l:'Botón principal',t:'text'},
+      {k:'heroCta',    g:'Portada',l:'Botón principal',t:'text',enlace:'heroCtaUrl'},
       {k:'heroCtaUrl', g:'Portada',l:'Destino del botón',t:'text'},
       {k:'heroImg',    g:'Portada',l:'Imagen de portada',t:'img'},
     ],
@@ -62,6 +69,7 @@ const SEC = {
   },
 
   heroBanner: {
+    nombre:'Portada', familia:'hero', variante:'Imagen de fondo',
     campos:'heroSplit',
     html:(d,t,a)=>`
 <section class="hero hero-banner">
@@ -80,6 +88,7 @@ const SEC = {
   },
 
   heroTipo: {
+    nombre:'Portada', familia:'hero', variante:'Sólo texto',
     campos:'heroSplit',
     html:(d,t,a)=>`
 <section class="hero hero-tipo"><div class="wrap">
@@ -95,14 +104,16 @@ const SEC = {
   },
 
   tiras: {
+    nombre:'Datos en cifras',
+    nuevo:{ tiras:[{valor:'10 años',etiqueta:'En el rubro'},{valor:'24 h',etiqueta:'Tiempo de respuesta'},{valor:'100%',etiqueta:'Clientes atendidos'}] },
     campos:[
       {k:'tiras',g:'Datos en cifras',l:'Cifras',t:'lista',add:'Agregar cifra',
         nuevo:{valor:'100+',etiqueta:'Dato'},
         item:[{k:'valor',l:'Cifra',t:'text'},{k:'etiqueta',l:'Qué mide',t:'text'}]},
     ],
-    html:(d,t,a)=> !(d.tiras||[]).length ? '' : `
+    html:(d,t,a)=> !(d.tiras||[]).length && !a.on ? '' : `
 <div class="tiras"><div class="wrap">
-  ${d.tiras.map((x,i)=>`<div class="tira"${a.it(`tiras.${i}`)}>
+  ${(d.tiras||[]).map((x,i)=>`<div class="tira"${a.it(`tiras.${i}`)}>
     <b${a.c(`tiras.${i}.valor`)}>${esc(x.valor)}</b>
     <span${a.c(`tiras.${i}.etiqueta`)}>${esc(x.etiqueta)}</span>
   </div>`).join('')}
@@ -110,9 +121,17 @@ const SEC = {
   },
 
   cards: {
+    nombre:'Catálogo',
+    nuevo:{ cardsTitulo:'Lo que ofrecemos', cardsIntro:'',
+      cards:[{titulo:'Producto uno',meta:'Gs. 100.000',texto:'Una línea que cuente qué es y para quién.',img:''},
+             {titulo:'Producto dos',meta:'Gs. 150.000',texto:'Una línea que cuente qué es y para quién.',img:''},
+             {titulo:'Producto tres',meta:'Gs. 200.000',texto:'Una línea que cuente qué es y para quién.',img:''}] },
+    variantes:{ campo:'_cardStyle', opts:[{v:'grid',l:'Cuadrícula'},{v:'compacto',l:'Cuadrícula compacta'},{v:'ancho',l:'Filas anchas'}] },
     campos:[
       {k:'cardsTitulo',g:'Catálogo',l:'Título de la sección',t:'text'},
       {k:'cardsIntro', g:'Catálogo',l:'Bajada',t:'textarea'},
+      {k:'_cardStyle', g:'Catálogo',l:'Disposición',t:'select',
+        opts:[{v:'grid',l:'Cuadrícula'},{v:'compacto',l:'Cuadrícula compacta'},{v:'ancho',l:'Filas anchas'}]},
       {k:'cards',      g:'Catálogo',l:'Ítems',t:'lista',add:'Agregar ítem',
         nuevo:{titulo:'Ítem nuevo',meta:'',texto:'',img:''},
         item:[{k:'titulo',l:'Título',t:'text'},{k:'meta',l:'Dato destacado (precio, medida, duración)',t:'text'},
@@ -132,15 +151,15 @@ const SEC = {
     ],
     html:(d,t,a)=>`
 <section class="sec" id="catalogo"><div class="wrap">
-  <div class="sec-h"><h2${a.c('cardsTitulo')}>${esc(d.cardsTitulo)}</h2>${d.cardsIntro?`<p${a.c('cardsIntro')}>${esc(d.cardsIntro)}</p>`:''}</div>
+  <div class="sec-h"><h2${a.c('cardsTitulo')}>${esc(d.cardsTitulo)}</h2>${d.cardsIntro||a.on?`<p${a.c('cardsIntro')}>${esc(d.cardsIntro)}</p>`:''}</div>
   <div class="rejilla ${esc(d._cardStyle||'grid')}" data-catalogo>
     ${(d.cards||[]).map((c,i)=>`
     <article class="tarj"${a.it(`cards.${i}`)}>
       ${media(c.img,t,i+1,'',a.im(`cards.${i}.img`))}
       <div class="cuerpo">
         <h3${a.c(`cards.${i}.titulo`)}>${esc(c.titulo)}</h3>
-        ${c.meta?`<div class="meta"${a.c(`cards.${i}.meta`)}>${esc(c.meta)}</div>`:''}
-        ${c.texto?`<p${a.c(`cards.${i}.texto`)}>${esc(c.texto)}</p>`:''}
+        ${c.meta||a.on?`<div class="meta"${a.c(`cards.${i}.meta`)}>${esc(c.meta)}</div>`:''}
+        ${c.texto||a.on?`<p${a.c(`cards.${i}.texto`)}>${esc(c.texto)}</p>`:''}
       </div>
     </article>`).join('')}
   </div>
@@ -148,6 +167,11 @@ const SEC = {
   },
 
   precios: {
+    nombre:'Lista de precios',
+    nuevo:{ preciosTitulo:'Precios', preciosIntro:'',
+      precios:[{seccion:'',nombre:'Servicio uno',detalle:'Qué incluye',precio:'Gs. 100.000'},
+               {seccion:'',nombre:'Servicio dos',detalle:'Qué incluye',precio:'Gs. 150.000'},
+               {seccion:'',nombre:'Servicio tres',detalle:'Qué incluye',precio:'Gs. 200.000'}] },
     campos:[
       {k:'preciosTitulo',g:'Lista de precios',l:'Título de la sección',t:'text'},
       {k:'preciosIntro', g:'Lista de precios',l:'Bajada',t:'textarea'},
@@ -161,7 +185,7 @@ const SEC = {
       (d.precios||[]).forEach((r,i)=>{ (g[r.seccion||''] ||= []).push({...r, _i:i}); });
       return `
 <section class="sec" id="precios"><div class="wrap">
-  <div class="sec-h"><h2${a.c('preciosTitulo')}>${esc(d.preciosTitulo)}</h2>${d.preciosIntro?`<p${a.c('preciosIntro')}>${esc(d.preciosIntro)}</p>`:''}</div>
+  <div class="sec-h"><h2${a.c('preciosTitulo')}>${esc(d.preciosTitulo)}</h2>${d.preciosIntro||a.on?`<p${a.c('preciosIntro')}>${esc(d.preciosIntro)}</p>`:''}</div>
   <div class="precios">
     ${Object.entries(g).map(([sec,rows])=>`
     <div class="bloque">
@@ -178,6 +202,11 @@ const SEC = {
   },
 
   pasos: {
+    nombre:'Cómo trabajamos',
+    nuevo:{ pasosTitulo:'Cómo trabajamos',
+      pasos:[{titulo:'Nos escribís',texto:'Por WhatsApp o por teléfono, contanos qué necesitás.'},
+             {titulo:'Te pasamos el presupuesto',texto:'En el día, sin compromiso.'},
+             {titulo:'Lo hacemos',texto:'En la fecha acordada, con factura a tu RUC.'}] },
     campos:[
       {k:'pasosTitulo',g:'Cómo trabajamos',l:'Título de la sección',t:'text'},
       {k:'pasos',      g:'Cómo trabajamos',l:'Pasos (en orden)',t:'lista',add:'Agregar paso',
@@ -197,6 +226,9 @@ const SEC = {
   },
 
   texto: {
+    nombre:'Sobre el negocio',
+    nuevo:{ textoTitulo:'Quiénes somos', textoImg:'',
+      textoCuerpo:'Contá la historia del negocio: cuándo empezó, quién está detrás y qué lo hace distinto.\n\nUn segundo párrafo con algo concreto que genere confianza.' },
     campos:[
       {k:'textoTitulo',g:'Sobre el negocio',l:'Título',t:'text'},
       {k:'textoCuerpo',g:'Sobre el negocio',l:'Texto (una línea en blanco separa párrafos)',t:'textarea'},
@@ -213,6 +245,9 @@ const SEC = {
   },
 
   faq: {
+    nombre:'Preguntas frecuentes',
+    nuevo:{ faqTitulo:'Preguntas frecuentes',
+      faq:[{p:'¿Hacen envíos?',r:'Sí, a todo el país.'},{p:'¿Qué formas de pago aceptan?',r:'Efectivo, transferencia, tarjetas y billeteras.'}] },
     campos:[
       {k:'faqTitulo',g:'Preguntas',l:'Título de la sección',t:'text'},
       {k:'faq',      g:'Preguntas',l:'Preguntas',t:'lista',add:'Agregar pregunta',
@@ -232,6 +267,10 @@ const SEC = {
   },
 
   testimonios: {
+    nombre:'Testimonios',
+    nuevo:{ testiTitulo:'Lo que dicen nuestros clientes',
+      testimonios:[{texto:'Muy buena atención y cumplieron con lo que prometieron.',autor:'Cliente, Asunción'},
+                   {texto:'Rápidos y prolijos. Los vuelvo a llamar.',autor:'Cliente, Luque'}] },
     campos:[
       {k:'testiTitulo',g:'Testimonios',l:'Título de la sección',t:'text'},
       {k:'testimonios',g:'Testimonios',l:'Comentarios',t:'lista',add:'Agregar comentario',
@@ -251,6 +290,9 @@ const SEC = {
   },
 
   contacto: {
+    nombre:'Contacto',
+    nuevo:{ contactoTitulo:'Contacto', contactoTexto:'Escribinos y te respondemos en el día.',
+      whatsapp:'', telefono:'', direccion:'', ciudad:'', horario:'', instagram:'', email:'', mapaUrl:'', pago:'' },
     campos:[
       {k:'contactoTitulo',g:'Contacto',l:'Título',t:'text'},
       {k:'contactoTexto', g:'Contacto',l:'Bajada',t:'textarea'},
@@ -272,7 +314,7 @@ const SEC = {
       return `
 <section class="sec contacto" id="contacto"><div class="wrap">
   <div>
-    <div class="sec-h"><h2${a.c('contactoTitulo')}>${esc(d.contactoTitulo)}</h2>${d.contactoTexto?`<p${a.c('contactoTexto')}>${esc(d.contactoTexto)}</p>`:''}</div>
+    <div class="sec-h"><h2${a.c('contactoTitulo')}>${esc(d.contactoTitulo)}</h2>${d.contactoTexto||a.on?`<p${a.c('contactoTexto')}>${esc(d.contactoTexto)}</p>`:''}</div>
     <div class="datos">
       ${fila('WhatsApp', d.whatsapp, wa(d.whatsapp,'Hola '+d.marca+', quiero hacer una consulta.'), 'whatsapp')}
       ${fila('Teléfono', d.telefono, tel(d.telefono), 'telefono')}
@@ -293,6 +335,7 @@ const SEC = {
   },
 
   pie: {
+    nombre:'Pie de página', fija:'abajo',
     campos:[],
     html:(d,t,a)=>`
 <footer class="pie"><div class="wrap">
@@ -302,7 +345,33 @@ const SEC = {
   <a href="${wa(d.whatsapp,'Hola '+d.marca)}">WhatsApp</a>
 </div></footer>`
   },
+
+  galeria: {
+    nombre:'Galería de fotos',
+    nuevo:{ galeriaTitulo:'Galería', galeria:[1,2,3,4,5,6].map(()=>({img:'',pie:''})) },
+    campos:[
+      {k:'galeriaTitulo',g:'Galería',l:'Título de la sección',t:'text'},
+      {k:'galeria',      g:'Galería',l:'Fotos',t:'lista',add:'Agregar foto',
+        nuevo:{img:'',pie:''},
+        item:[{k:'pie',l:'Epígrafe (opcional)',t:'text'},{k:'img',l:'Foto',t:'img'}]},
+    ],
+    html:(d,t,a)=>`
+<section class="sec" id="galeria"><div class="wrap">
+  <div class="sec-h"><h2${a.c('galeriaTitulo')}>${esc(d.galeriaTitulo)}</h2></div>
+  <div class="galeria">
+    ${(d.galeria||[]).map((g,i)=>`<figure${a.it(`galeria.${i}`)}>
+      ${media(g.img,t,i+2,'',a.im(`galeria.${i}.img`))}
+      ${g.pie||a.on?`<figcaption${a.c(`galeria.${i}.pie`)}>${esc(g.pie)}</figcaption>`:''}
+    </figure>`).join('')}
+  </div>
+</div></section>`
+  },
 };
+
+/* secciones que se pueden agregar, una por familia (las portadas son variantes de una) */
+const FAMILIA = n => (SEC[n] && SEC[n].familia) || n;
+const CATALOGO_SECCIONES = ['nav','heroSplit','tiras','cards','galeria','precios','pasos','texto','testimonios','faq','contacto','pie'];
+const VARIANTES_PORTADA = ['heroSplit','heroBanner','heroTipo'];
 
 /* campos de estilo, comunes a todos los rubros */
 const CAMPOS_ESTILO = [
@@ -317,8 +386,6 @@ const CAMPOS_ESTILO = [
     formato:v=>Math.round(v)+' px'},
   {k:'_aire',  g:'Estilo',l:'Aire entre secciones',t:'rango',min:0.6,max:1.5,paso:0.05,vivo:'--aire',
     formato:v=>Math.round(v*100)+'%'},
-  {k:'_cardStyle',g:'Estilo',l:'Disposición del catálogo',t:'select',
-    opts:[{v:'grid',l:'Cuadrícula'},{v:'compacto',l:'Cuadrícula compacta'},{v:'ancho',l:'Filas anchas'}]},
 ];
 
 /* valores de estilo que todo rubro hereda si no los define */
@@ -328,18 +395,24 @@ const ESTILO_POR_DEFECTO = {
   _apiBase:'https://tiendita-ebon-one.vercel.app',
 };
 
-/* reúne los campos de un rubro a partir de sus secciones */
-function camposDe(tpl){
+/* los campos que declara una sección */
+function camposSeccion(nombre){
+  const s = SEC[nombre]; if(!s) return [];
+  return (typeof s.campos === 'string' ? SEC[s.campos].campos : s.campos) || [];
+}
+
+/* reúne los campos de una lista de secciones, más los de estilo */
+function camposDe(secciones){
   const out = [], vistos = new Set();
-  tpl.secciones.forEach(nombre => {
-    let s = SEC[nombre]; if(!s) return;
-    let cs = s.campos;
-    if(typeof cs === 'string') cs = SEC[cs].campos;
-    (cs||[]).forEach(c => { if(!vistos.has(c.k)){ vistos.add(c.k); out.push(c); } });
-  });
+  secciones.forEach(nombre => camposSeccion(nombre).forEach(c => {
+    if(!vistos.has(c.k)){ vistos.add(c.k); out.push(c); }
+  }));
   CAMPOS_ESTILO.forEach(c => { if(!vistos.has(c.k)){ vistos.add(c.k); out.push(c); } });
   return out;
 }
+
+/* las secciones de esta página: las que eligió el usuario o las del rubro */
+const seccionesDe = (tpl, d) => d._secciones || tpl.secciones;
 
 /* ---------- capa de edición: sólo va en la vista previa ---------- */
 function capaEditorCss(){ return `
@@ -350,7 +423,13 @@ function capaEditorCss(){ return `
 [data-item]:hover{outline:1px dashed rgba(37,99,235,.45);outline-offset:7px}
 .tp-sel,.tp-sel:hover{outline:2px solid #2563EB !important;box-shadow:0 0 0 4px rgba(37,99,235,.20)}
 [data-campo][contenteditable="true"]{outline:2px solid #2563EB;box-shadow:0 0 0 4px rgba(37,99,235,.20)}
-[data-campo][contenteditable="true"]:empty::before{content:attr(data-vacio);opacity:.45}
+[data-campo]:empty::before{content:attr(data-vacio);opacity:.4;font-style:italic}
+[data-campo]:empty{display:inline-block;min-width:4em}
+[data-sec]{position:relative}
+[data-sec].sec-hover::after{content:"";position:absolute;inset:0;pointer-events:none;
+  outline:2px solid rgba(37,99,235,.55);outline-offset:-2px;z-index:30}
+[data-item][data-arrastrando],[data-sec][data-arrastrando]{opacity:.35}
+.tp-soltar{outline:3px solid #16A34A !important;outline-offset:-3px}
 `; }
 
 /* ---------- catálogo leído de Notion en cada visita ----------
@@ -394,7 +473,11 @@ function guionCatalogo(d){
 function renderDoc(tpl, d, editable){
   const t = tema(d);
   const a = marcas(!!editable);
-  const cuerpo = tpl.secciones.map(n => SEC[n] ? SEC[n].html(d,t,a) : '').join('\n');
+  const cuerpo = seccionesDe(tpl, d).map((n, i) => {
+    const html = SEC[n] ? SEC[n].html(d,t,a) : '';
+    // en edición cada sección lleva su número, para poder moverla o quitarla
+    return editable ? html.replace(/^(\s*<[a-z]+)/, `$1 data-sec="${i}"`) : html;
+  }).join('\n');
   const titulo = [d.marca, tpl.rubro].filter(Boolean).join(' — ');
   const desc = (d.heroTexto || d.contactoTexto || '').slice(0,155);
   return `<!doctype html>
