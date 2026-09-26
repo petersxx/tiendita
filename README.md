@@ -76,6 +76,7 @@ js/rubros.js        Los 14 rubros con su contenido de arranque
 js/app.js           Panel, edición directa, zoom, subida a R2, guardado y exportación
 api/subir.js        Firma la subida a R2 (las claves no salen del servidor)
 api/catalogo.js     Lee la base de productos de Notion y la normaliza
+api/publicar.js     Publica una demo como proyecto propio en Vercel
 api/_comun.js       CORS y utilidades compartidas
 tools/build-artifact.mjs   Arma el archivo único que consume el Artifact de Claude
 ```
@@ -214,6 +215,42 @@ exportar:
   un precio en Notion y se ve solo. Los productos escritos quedan igual como
   **respaldo**: si Notion tarda o falla, la página muestra la última versión
   exportada en vez de un hueco.
+
+## Publicar demos para clientes
+
+El botón **Publicar demo** sube la página tal como se exporta a Vercel y
+devuelve un enlace para mandarle al cliente (con atajo a WhatsApp).
+
+- Cada demo es **su propio proyecto** en Vercel, `demo-<nombre>`, con dirección
+  `https://demo-<nombre>.vercel.app` (si el nombre ya existe en otra cuenta,
+  Vercel le agrega un sufijo; la dirección real aparece en el diálogo).
+- Volver a publicar la misma demo **actualiza la misma dirección**: el nombre
+  queda guardado en el proyecto.
+- Las demos se publican **sin la pantalla de login de Vercel**, para que el
+  cliente las abra directo.
+
+```
+navegador ──POST /api/publicar (HTML + clave)──► Vercel (tiendita) ──VERCEL_TOKEN──► API de Vercel
+                                                                 crea demo-x y despliega index.html
+```
+
+Hace falta cargar, una sola vez:
+
+| Variable | Qué es |
+|---|---|
+| `VERCEL_TOKEN` | Token de <https://vercel.com/account/tokens>, con alcance al equipo donde van las demos |
+| `VERCEL_TEAM_ID` | El id del equipo (`team_…`). Sin él, las demos van a la cuenta personal del token |
+| `PUBLICAR_TOKEN` | Una clave que inventás vos. Se escribe en el diálogo la primera vez y queda en ese navegador. **Obligatoria**: sin ella la función no publica, porque cualquiera que abra el editor podría desplegar en tu cuenta |
+
+```bash
+vercel env add VERCEL_TOKEN production
+vercel env add VERCEL_TEAM_ID production
+vercel env add PUBLICAR_TOKEN production
+vercel --prod
+```
+
+Para borrar una demo vieja: panel de Vercel → proyecto `demo-…` → *Settings* →
+*Delete project*, o `vercel project rm demo-…`.
 
 ## Dónde se guardan los proyectos
 

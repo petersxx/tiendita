@@ -827,6 +827,98 @@ if(inputClave){
   });
 }
 
+/* =========================================================
+   PUBLICAR DEMO EN VERCEL
+   /api/publicar crea un proyecto demo-<nombre> por demo y le sube
+   el mismo HTML que se exporta. El nombre queda en la demo, así
+   volver a publicarla actualiza la dirección que ya tiene el cliente.
+   ========================================================= */
+const CLAVE_PUBLICAR = 'taller.clavePublicar';
+const nombreDemo = s => slug(String(s || '').replace(/^demo-/, '')).slice(0, 47).replace(/-+$/, '');
+
+function abrirPublicar(){
+  const veil = document.createElement('div');
+  veil.className = 'veil';
+  veil.innerHTML = `<div class="sheet" role="dialog" aria-modal="true" aria-label="Publicar demo" style="width:min(520px,100%)">
+    <div class="sheet-h"><h2>Publicar demo</h2>
+      <button class="btn ghost" type="button" data-cerrar aria-label="Cerrar">✕</button></div>
+    <div class="sheet-b publicar">
+      <label class="rail-campo"><span>Dirección</span>
+        <div class="dominio">demo-<input type="text" data-nombre spellcheck="false" autocomplete="off">.vercel.app</div></label>
+      <label class="rail-campo"><span>Clave de publicación</span>
+        <input type="password" data-clave autocomplete="off" spellcheck="false" placeholder="la de PUBLICAR_TOKEN"></label>
+      <p class="hint" data-nota></p>
+      <div class="fila"><button class="btn primary" type="button" data-publicar>Publicar</button></div>
+      <div data-resultado hidden>
+        <a class="enlace" data-enlace target="_blank" rel="noopener"></a>
+        <div class="fila" style="margin-top:8px">
+          <button class="btn" type="button" data-copiar>Copiar enlace</button>
+          <a class="btn" data-wa target="_blank" rel="noopener">Mandar por WhatsApp</a>
+        </div>
+      </div>
+    </div></div>`;
+  const q = s => veil.querySelector(s);
+  const inNombre = q('[data-nombre]'), inClave = q('[data-clave]'), nota = q('[data-nota]'), btn = q('[data-publicar]');
+  inNombre.value = nombreDemo(D._demo || D.marca || TPL.rubro);
+  inClave.value = leerLocal(CLAVE_PUBLICAR, '') || '';
+  nota.textContent = D._demo
+    ? 'Esta demo ya está publicada: volver a publicarla actualiza la misma dirección.'
+    : 'Si el nombre ya lo usa otra cuenta, Vercel le agrega un sufijo. La dirección final aparece abajo.';
+
+  const mostrar = url => {
+    q('[data-resultado]').hidden = false;
+    const a = q('[data-enlace]'); a.href = url; a.textContent = url;
+    q('[data-wa]').href = 'https://wa.me/?text=' + encodeURIComponent('Te comparto la demo de tu página: ' + url);
+  };
+  if(D._demoUrl && D._demo === 'demo-' + inNombre.value) mostrar(D._demoUrl);
+
+  document.body.appendChild(veil);
+  inNombre.focus();
+  const cerrar = ()=>{ veil.remove(); document.removeEventListener('keydown', tecla); };
+  const tecla = e => { if(e.key==='Escape') cerrar(); };
+  document.addEventListener('keydown', tecla);
+
+  veil.addEventListener('click', async e=>{
+    if(e.target===veil || e.target.closest('[data-cerrar]')) return cerrar();
+    if(e.target.closest('[data-copiar]')){
+      try{ await navigator.clipboard.writeText(D._demoUrl); aviso('Enlace copiado'); }
+      catch(err){ aviso('No se pudo copiar: seleccioná el enlace'); }
+      return;
+    }
+    if(!e.target.closest('[data-publicar]')) return;
+
+    const nombre = nombreDemo(inNombre.value);
+    const clave = inClave.value.trim();
+    const base = apiBase();
+    if(!nombre){ aviso('Poné un nombre para la dirección.'); return; }
+    if(!clave){ aviso('Falta la clave de publicación.'); return; }
+    if(!base){ aviso('Falta la dirección de la API, en «Catálogo desde Notion».'); return; }
+    inNombre.value = nombre;
+    escribirLocal(CLAVE_PUBLICAR, clave);
+
+    btn.disabled = true; btn.textContent = 'Publicando…';
+    try{
+      const r = await fetch(base + '/api/publicar', {
+        method:'POST',
+        headers:{ 'Content-Type':'application/json', 'x-publicar-token':clave },
+        body: JSON.stringify({ proyecto:nombre, html:renderDoc(TPL, D) })
+      });
+      const j = await r.json().catch(()=>({}));
+      if(!r.ok) throw new Error([j.error || 'Vercel no respondió.', j.vercel, j.faltan && j.faltan.join(', ')].filter(Boolean).join(' · '));
+      D._demo = j.proyecto; D._demoUrl = j.url;
+      apuntarGuardado();
+      mostrar(j.url);
+      nota.textContent = j.listo ? 'Listo. Ya se puede abrir.' : 'Publicada; Vercel todavía la está terminando, en unos segundos abre.';
+      aviso('Demo publicada');
+    }catch(err){
+      nota.textContent = explicarFalloDeRed(err);
+    }finally{
+      btn.disabled = false; btn.textContent = 'Publicar de nuevo';
+    }
+  });
+}
+$('#btn-publicar').addEventListener('click', abrirPublicar);
+
 /* ---------- arranque ---------- */
 irA('vista');
 abrirRubro(RUBROS[0].id);
