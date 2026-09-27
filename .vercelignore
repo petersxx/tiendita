@@ -1,0 +1,4 @@
+# guías de Clerk para el asistente de código: van en el repo, no en el sitio
+.agents
+.claude
+skills-lock.json
