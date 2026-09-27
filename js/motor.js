@@ -1,7 +1,8 @@
 /* =========================================================
    TALLER DE PÁGINAS — motor de plantillas
    Una plantilla por rubro. Cada página exportada es un HTML
-   autónomo: sin scripts, sin dependencias, sólo Google Fonts.
+   autónomo: sin dependencias, sólo Google Fonts. Lleva un script
+   únicamente si tiene tienda con carrito o catálogo vivo de Notion.
    ========================================================= */
 
 /* ---------- utilidades ---------- */
@@ -167,6 +168,54 @@ p:last-child{margin-bottom:0}
 .rejilla.ancho .tarj .arte,.rejilla.ancho .tarj img{width:38%;max-width:320px;aspect-ratio:auto;min-height:190px;flex:none}
 .rejilla.ancho .tarj .cuerpo{padding:22px 24px;justify-content:center}
 .rejilla.ancho .tarj h3{font-size:calc(21px*var(--esc))}
+
+/* tienda y carrito */
+[hidden]{display:none!important}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.btn.chico{padding:9px 16px;font-size:13.5px;cursor:pointer}
+.filtros{display:flex;flex-wrap:wrap;gap:8px;margin:-8px 0 24px}
+.chip{font:600 13.5px ${t.txt};padding:8px 16px;border-radius:999px;border:1px solid ${t.linea};background:transparent;color:${t.fg};cursor:pointer}
+.chip:hover{border-color:${t.fg}}
+.chip.on{background:${t.fg};color:${t.bg};border-color:${t.fg}}
+.prod .foto{position:relative}
+.etq{position:absolute;top:12px;left:12px;background:${t.ac};color:${t.onAc};font-size:11.5px;font-weight:700;letter-spacing:.06em;
+  text-transform:uppercase;padding:5px 10px;border-radius:999px}
+.etq:empty{background:${alpha(t.bg,.8)};color:${t.fg}}
+.etq.agot{background:${t.fg};color:${t.bg}}
+.prod .cat{font-size:11.5px;letter-spacing:.12em;text-transform:uppercase;color:${t.mudo}}
+.prod .compra{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:auto;padding-top:10px}
+.prod .compra .meta{font-size:calc(16px*var(--esc));font-weight:700}
+.carro-btn{position:fixed;right:18px;bottom:18px;z-index:40;display:flex;align-items:center;gap:8px;padding:13px 18px;
+  border-radius:999px;border:0;background:${t.ac};color:${t.onAc};font:600 15px ${t.txt};cursor:pointer;box-shadow:0 8px 28px ${alpha(t.fg,.25)}}
+.carro-btn b{background:${t.onAc};color:${t.ac};min-width:22px;height:22px;border-radius:11px;display:grid;place-items:center;font-size:12.5px;padding:0 6px}
+.carro-btn.salto{animation:salto .4s}
+@keyframes salto{40%{transform:scale(1.12)}}
+.carro-velo{position:fixed;inset:0;z-index:50;background:${alpha(t.fg,.4)}}
+.carro{position:fixed;top:0;right:0;bottom:0;z-index:51;width:min(420px,100%);background:${t.bg};color:${t.fg};
+  display:flex;flex-direction:column;box-shadow:-10px 0 40px ${alpha(t.fg,.2)};overflow-y:auto}
+.carro-h{display:flex;align-items:center;justify-content:space-between;padding:18px 20px;border-bottom:1px solid ${t.linea};position:sticky;top:0;background:${t.bg}}
+.carro-h h3{font-size:20px}
+.carro-x{border:0;background:none;color:${t.fg};font-size:18px;cursor:pointer;padding:6px}
+.carro-lineas{padding:6px 20px}
+.linea{display:grid;grid-template-columns:1fr auto;gap:6px 12px;padding:14px 0;border-bottom:1px solid ${t.linea};font-size:14.5px}
+.linea small{display:block;color:${t.mudo};font-size:12.5px}
+.linea .sub{grid-column:2;grid-row:1;text-align:right;white-space:nowrap}
+.linea .cant{display:flex;align-items:center;gap:10px}
+.cant button{width:30px;height:30px;border-radius:50%;border:1px solid ${t.linea};background:${t.sup};color:${t.fg};font-size:16px;cursor:pointer}
+.carro-vacio{color:${t.mudo};padding:24px 0}
+.carro-form{display:flex;flex-direction:column;gap:12px;padding:6px 20px 24px}
+.carro-tot{background:${t.sup};border-radius:var(--rad);padding:12px 14px;font-size:14.5px}
+.carro-tot div{display:flex;justify-content:space-between;padding:3px 0}
+.carro-tot p{font-size:12.5px;color:${t.ac};margin:4px 0}
+.carro-tot .total{border-top:1px solid ${t.linea};margin-top:6px;padding-top:8px;font-size:17px}
+.carro-form label{display:flex;flex-direction:column;gap:5px;font-size:12.5px;font-weight:600;color:${t.mudo}}
+.carro-form input,.carro-form select,.carro-form textarea{font:15px ${t.txt};color:${t.fg};background:${t.sup};border:1px solid ${t.linea};
+  border-radius:calc(var(--rad)*.6);padding:10px 12px;width:100%}
+.carro-form .btn{cursor:pointer;margin-top:4px}
+.carro-vaciar{border:0;background:none;color:${t.mudo};font:13px ${t.txt};text-decoration:underline;cursor:pointer}
+.carro-aviso{position:fixed;left:50%;bottom:84px;z-index:60;transform:translate(-50%,20px);opacity:0;pointer-events:none;
+  background:${t.fg};color:${t.bg};padding:10px 16px;border-radius:999px;font-size:14px;transition:.25s}
+.carro-aviso.on{opacity:1;transform:translate(-50%,0)}
 
 /* lista de precios */
 .precios{display:flex;flex-direction:column;gap:clamp(26px,4vw,42px)}

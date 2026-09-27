@@ -354,3 +354,8 @@ button{font:inherit;color:inherit}
   .topbar{gap:8px;padding:0 10px}
 }
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+
+/* cuenta */
+.cuenta{display:flex;align-items:center;min-width:32px;justify-content:center}
+.cuenta-off{font-size:12px;color:var(--muted);font-family:var(--mono)}
+.enlace{background:none;border:0;padding:0;font:inherit;color:var(--accent);text-decoration:underline;cursor:pointer}

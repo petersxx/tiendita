@@ -81,6 +81,53 @@ const RUBROS = [
   }
 },
 {
+  id:'tienda', rubro:'Tienda online', sub:'Carrito · Pedidos por WhatsApp', ini:'Ti',
+  secciones:['nav','heroSplit','tiras','tienda','pasos','faq','contacto','pie'],
+  d:{
+    _accent:'#C2410C', _bg:'#FBF7F2', _fg:'#1C1410', _font:'suave', _cardStyle:'grid', _moneda:'Gs.',
+    marca:'Ñandutí Casa', navCta:'Hacer un pedido',
+    navLinks:[{txt:'Tienda',url:'#tienda'},{txt:'Preguntas',url:'#preguntas'},{txt:'Contacto',url:'#contacto'}],
+    heroEyebrow:'Artesanía paraguaya · envíos a todo el país',
+    heroTitulo:'Todo para el tereré y la casa, hecho por manos de acá',
+    heroTexto:'Guampas, termos forrados, cerámica de Itá y ñandutí de Itauguá. Armá tu pedido en el carrito y lo confirmamos por WhatsApp en minutos.',
+    heroCta:'Ver la tienda', heroCtaUrl:'#tienda', heroImg:'',
+    tiras:[{valor:'Gs. 350.000',etiqueta:'Envío gratis desde'},{valor:'24 a 48 h',etiqueta:'Entrega en Gran Asunción'},
+           {valor:'40+',etiqueta:'Artesanos de 6 ciudades'},{valor:'Factura',etiqueta:'A tu RUC en cada compra'}],
+    tiendaTitulo:'Tienda',
+    tiendaIntro:'Tocá «Agregar» y después el carrito de abajo a la derecha. Precios con IVA incluido.',
+    tiendaEnvio:'Gs. 25.000', tiendaGratis:'Gs. 350.000',
+    tiendaPagos:'Transferencia bancaria, Tigo Money, Billetera Personal, Zimple, Efectivo contra entrega',
+    productos:[
+      {titulo:'Guampa de palo santo',precio:'Gs. 95.000',texto:'Tallada a mano en Filadelfia, con virola de alpaca.',categoria:'Tereré',etiqueta:'Más vendido',img:''},
+      {titulo:'Termo forrado en cuero',precio:'Gs. 185.000',texto:'1,2 litros, acero inoxidable. Forro con tu nombre grabado.',categoria:'Tereré',etiqueta:'',img:''},
+      {titulo:'Bombilla de alpaca',precio:'Gs. 65.000',texto:'Pico curvo y filtro desarmable para limpiar fácil.',categoria:'Tereré',etiqueta:'',img:''},
+      {titulo:'Kit tereré completo',precio:'Gs. 320.000',texto:'Termo, guampa, bombilla y bolso térmico de lona.',categoria:'Tereré',etiqueta:'Oferta',img:''},
+      {titulo:'Camino de mesa de ñandutí',precio:'Gs. 240.000',texto:'1,20 m, tejido en Itauguá. Colores a elección.',categoria:'Textil',etiqueta:'',img:''},
+      {titulo:'Mantel de ao po’i',precio:'Gs. 410.000',texto:'Para seis personas, bordado en Yataity.',categoria:'Textil',etiqueta:'Agotado',img:''},
+      {titulo:'Cántaro de Itá',precio:'Gs. 130.000',texto:'Cerámica cocida a leña. Mantiene fresca el agua.',categoria:'Deco',etiqueta:'',img:''},
+      {titulo:'Pedido a medida',precio:'A consultar',texto:'Regalos empresariales y souvenirs con logo.',categoria:'Deco',etiqueta:'',img:''}],
+    pasosTitulo:'Cómo comprar',
+    pasos:[
+      {titulo:'Armá el carrito',texto:'Agregá los productos que quieras y elegí envío o retiro.'},
+      {titulo:'Mandá el pedido',texto:'El carrito arma el mensaje con todo el detalle y lo envía a nuestro WhatsApp.'},
+      {titulo:'Confirmamos y pagás',texto:'Te respondemos con el stock y los datos de pago. Facturamos a tu RUC.'},
+      {titulo:'Lo recibís',texto:'En 24 a 48 horas en Gran Asunción, o por encomienda al interior.'}],
+    faqTitulo:'Preguntas frecuentes',
+    faq:[
+      {p:'¿Hacen envíos al interior?',r:'Sí, por encomienda a todo el país. El costo lo paga quien recibe, según la empresa que elijas.'},
+      {p:'¿Puedo pagar contra entrega?',r:'En Gran Asunción, sí: en efectivo o con QR al recibir. Al interior se paga antes del despacho.'},
+      {p:'¿Y si el producto llega dañado?',r:'Mandanos una foto dentro de las 48 horas y te lo cambiamos sin costo.'}],
+    contactoTitulo:'¿Dudas con tu pedido?',
+    contactoTexto:'Escribinos por WhatsApp o pasá por el showroom a ver los productos en persona.',
+    whatsapp:'0982 610 443', telefono:'',
+    direccion:'Mcal. Estigarribia 1120 c/ Brasil', ciudad:'Asunción',
+    horario:'Lun a vie 9:00–18:00 · Sáb 9:00–13:00',
+    instagram:'nanduticasa', email:'pedidos@nanduticasa.com.py',
+    mapaUrl:'https://www.google.com/maps/search/?api=1&query=Mcal.+Estigarribia+1120+Asuncion',
+    pago:'Transferencia, Tigo Money, Billetera Personal, Zimple y efectivo',
+  }
+},
+{
   id:'belleza', rubro:'Belleza', sub:'Barbería · Peluquería · Estética', ini:'Be',
   secciones:['nav','heroTipo','precios','pasos','texto','contacto','pie'],
   d:{
