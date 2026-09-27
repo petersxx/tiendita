@@ -2,3 +2,8 @@
 .agents
 .claude
 skills-lock.json
+
+# nunca subir variables de entorno ni dependencias locales en un deploy desde la CLI
+.env
+.env.*
+node_modules

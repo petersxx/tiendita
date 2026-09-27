@@ -4,8 +4,7 @@
    la misma dirección que ya le mandaste al cliente.
 
    Cuerpo:    { proyecto, proyectoId, html, archivos: [{ file, sha, size }] }
-   Cabeceras: x-publicar-token: <PUBLICAR_TOKEN>
-              Authorization: Bearer <token de sesión de Clerk>
+   Cabecera:  Authorization: Bearer <token de sesión de Clerk>
    Respuesta: { url, proyecto, deploy, listo }
               409 { faltanArchivos: [sha] } si Vercel no tiene alguna imagen
 
@@ -15,9 +14,10 @@
    Respuesta: { ok: true }
 
    El VERCEL_TOKEN nunca sale de acá. Como con él se puede desplegar en
-   tu cuenta, esta función exige PUBLICAR_TOKEN: sin esa variable no
-   publica nada. El registro de cuentas es abierto, así que la sesión
-   sola no alcanza: la clave dice quién puede publicar.
+   tu cuenta y el registro de cuentas es abierto, la sesión sola no
+   alcanza: publica sólo quien tiene `publicar: true` en la metadata
+   pública de su usuario de Clerk. Esa metadata la escribe únicamente
+   el servidor o el panel de Clerk; el navegador no puede cambiarla.
 
    Cada dirección es de un solo proyecto (columna Demo de la base
    Proyectos). Se publica sólo desde un proyecto propio y guardado, y
@@ -27,11 +27,11 @@
 */
 import { createHash } from 'node:crypto';
 import { cors, faltantes, error } from './_comun.js';
-import { usuarioDe } from './_sesion.js';
+import { usuarioDe, puedePublicar } from './_sesion.js';
 import { notion, consultar, texto, leer, limpiarId, proyectoDe, DB_PROYECTOS } from './_notion.js';
 
 const API = 'https://api.vercel.com';
-const REQUERIDAS = ['VERCEL_TOKEN', 'PUBLICAR_TOKEN', 'CLERK_SECRET_KEY', 'NOTION_TOKEN', 'NOTION_DB_PROYECTOS'];
+const REQUERIDAS = ['VERCEL_TOKEN', 'CLERK_SECRET_KEY', 'NOTION_TOKEN', 'NOTION_DB_PROYECTOS'];
 const MAX_BYTES = 4 * 1024 * 1024;   // el límite del cuerpo de una función es 4,5 MB
 const ESPERA_MS = 25000;
 const IMG_MAX_BYTES = 3 * 1024 * 1024;
@@ -112,11 +112,11 @@ export default async function handler(req, res) {
   const faltan = faltantes(REQUERIDAS);
   if (faltan.length) return error(res, 500, 'Al proyecto le faltan variables de entorno en Vercel.', { faltan });
 
-  if (req.headers['x-publicar-token'] !== process.env.PUBLICAR_TOKEN) {
-    return error(res, 401, 'Clave de publicación inválida o ausente.');
-  }
   const usuario = await usuarioDe(req);
   if (!usuario) return error(res, 401, 'Ingresá con tu usuario para publicar.');
+  if (!(await puedePublicar(usuario))) {
+    return error(res, 403, 'Tu cuenta todavía no tiene permiso para publicar demos. Pedíselo al administrador.');
+  }
 
   if (req.body?.subir) return subirArchivo(res, req.body.subir);
 

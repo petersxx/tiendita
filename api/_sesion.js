@@ -24,3 +24,14 @@ export async function nombreDeUsuario(id) {
     return '';
   }
 }
+
+/** Si el usuario puede publicar demos: `publicar: true` en su metadata pública.
+ *  La metadata pública sólo se escribe desde el servidor o el panel de Clerk. */
+export async function puedePublicar(id) {
+  try {
+    const u = await createClerkClient({ secretKey: process.env.CLERK_SECRET_KEY }).users.getUser(id);
+    return u.publicMetadata?.publicar === true;
+  } catch {
+    return false;
+  }
+}

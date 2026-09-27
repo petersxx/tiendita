@@ -198,9 +198,12 @@ devuelve un enlace para mandarle al cliente (con atajo a WhatsApp).
 
 ### Cada dirección tiene dueño
 
-Publicar pide **haber ingresado** y la **clave de publicación**. La clave sigue
-porque el registro de cuentas es abierto: dice quién puede desplegar en tu
-cuenta de Vercel. La sesión dice de quién es cada demo.
+Publicar pide **haber ingresado** con una cuenta que tenga **permiso para
+publicar**: `{"publicar": true}` en la *metadata pública* del usuario de Clerk
+(panel de Clerk → *Users* → el usuario → *Metadata* → *Public*). Esa metadata
+sólo se escribe desde el servidor o el panel: el navegador no puede dársela.
+Hace falta porque el registro es abierto y publicar despliega en tu cuenta de
+Vercel. En el navegador no hay ninguna clave.
 
 - La demo se publica desde un **proyecto guardado**. El editor lo guarda solo
   si hace falta. La dirección queda a nombre de ese proyecto, en la columna
@@ -214,22 +217,20 @@ cuenta de Vercel. La sesión dice de quién es cada demo.
 - Si dos personas piden la misma dirección a la vez, se la queda una sola.
 
 ```
-navegador ──POST /api/publicar (HTML + clave + sesión)──► Vercel (tiendita) ──VERCEL_TOKEN──► API de Vercel
+navegador ──POST /api/publicar (HTML + sesión)──► Vercel (tiendita) ──VERCEL_TOKEN──► API de Vercel
                                                                  crea demo-x y despliega index.html
 ```
 
-Hace falta cargar, una sola vez:
+Hace falta cargar, una sola vez (sólo en el servidor):
 
 | Variable | Qué es |
 |---|---|
 | `VERCEL_TOKEN` | Token de <https://vercel.com/account/tokens>, con alcance al equipo donde van las demos |
 | `VERCEL_TEAM_ID` | El id del equipo (`team_…`). Sin él, las demos van a la cuenta personal del token |
-| `PUBLICAR_TOKEN` | Una clave que inventás vos. Se escribe en el diálogo la primera vez y queda en ese navegador. **Obligatoria**: sin ella la función no publica, porque cualquiera que abra el editor podría desplegar en tu cuenta |
 
 ```bash
 vercel env add VERCEL_TOKEN production
 vercel env add VERCEL_TEAM_ID production
-vercel env add PUBLICAR_TOKEN production
 vercel --prod
 ```
 

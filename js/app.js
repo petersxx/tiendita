@@ -1315,7 +1315,8 @@ async function subirImagen(archivo, ruta){
    el mismo HTML que se exporta. El nombre queda en la demo, así
    volver a publicarla actualiza la dirección que ya tiene el cliente.
    ========================================================= */
-const CLAVE_PUBLICAR = 'taller.clavePublicar';
+// antes se guardaba acá la clave de publicación; ahora el permiso vive en la cuenta y no hay claves en el navegador
+try{ localStorage.removeItem('taller.clavePublicar'); }catch(e){}
 const nombreDemo = s => slug(String(s || '').replace(/^demo-/, '')).slice(0, 47).replace(/-+$/, '');
 
 function abrirPublicar(){
@@ -1329,8 +1330,6 @@ function abrirPublicar(){
     <div class="sheet-b publicar">
       <label class="rail-campo"><span>Dirección</span>
         <div class="dominio">demo-<input type="text" data-nombre spellcheck="false" autocomplete="off">.vercel.app</div></label>
-      <label class="rail-campo"><span>Clave de publicación</span>
-        <input type="password" data-clave autocomplete="off" spellcheck="false" placeholder="la de PUBLICAR_TOKEN"></label>
       <p class="hint" data-nota></p>
       <div class="fila"><button class="btn primary" type="button" data-publicar>Publicar</button></div>
       <div data-resultado hidden>
@@ -1342,9 +1341,8 @@ function abrirPublicar(){
       </div>
     </div></div>`;
   const q = s => veil.querySelector(s);
-  const inNombre = q('[data-nombre]'), inClave = q('[data-clave]'), nota = q('[data-nota]'), btn = q('[data-publicar]');
+  const inNombre = q('[data-nombre]'), nota = q('[data-nota]'), btn = q('[data-publicar]');
   inNombre.value = nombreDemo(D._demo || D.marca || TPL.rubro);
-  inClave.value = leerLocal(CLAVE_PUBLICAR, '') || '';
   nota.textContent = D._demo
     ? 'Esta demo ya está publicada: volver a publicarla actualiza la misma dirección.'
     : 'Si el nombre ya lo usa otra cuenta, Vercel le agrega un sufijo. La dirección final aparece abajo.';
@@ -1372,12 +1370,9 @@ function abrirPublicar(){
     if(!e.target.closest('[data-publicar]')) return;
 
     const nombre = nombreDemo(inNombre.value);
-    const clave = inClave.value.trim();
     const base = apiBase();
     if(!nombre){ aviso('Poné un nombre para la dirección.'); return; }
-    if(!clave){ aviso('Falta la clave de publicación.'); return; }
     inNombre.value = nombre;
-    escribirLocal(CLAVE_PUBLICAR, clave);
 
     btn.disabled = true; btn.textContent = 'Publicando…';
     try{
@@ -1395,7 +1390,7 @@ function abrirPublicar(){
         if(!token || !esDe(uid)) throw new Error('Cambió la sesión. Ingresá de nuevo para publicar.');
         const r = await fetch(base + '/api/publicar', {
           method:'POST',
-          headers:{ 'Content-Type':'application/json', 'x-publicar-token':clave, Authorization:'Bearer ' + token },
+          headers:{ 'Content-Type':'application/json', Authorization:'Bearer ' + token },
           body: JSON.stringify(cuerpo)
         });
         return { r, j: await r.json().catch(()=>({})) };
