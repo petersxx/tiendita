@@ -32,10 +32,18 @@ function aviso(txt){
 function leerLocal(k, alt){ try{ return JSON.parse(localStorage.getItem(k)) ?? alt; }catch(e){ return alt; } }
 function escribirLocal(k, v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){} }
 
-/* ---------- borradores: nunca se pierde lo que estabas editando ---------- */
-const BORRADORES = 'taller.borradores';
-function guardarBorrador(){ const b = leerLocal(BORRADORES,{}); b[TPL.id] = D; escribirLocal(BORRADORES,b); }
-function leerBorrador(id){ return leerLocal(BORRADORES,{})[id] || null; }
+/* ---------- borradores: nunca se pierde lo que estabas editando ----------
+   Uno por usuario: en una compu compartida, quien ingresa no ve lo que
+   editó otro. Sin sesión se usa el borrador anónimo de este navegador. */
+const BORRADORES = () => 'taller.borradores.' + (cuenta.usuario ? cuenta.usuario.id : 'anonimo');
+function guardarBorrador(){ const b = leerLocal(BORRADORES(),{}); b[TPL.id] = D; escribirLocal(BORRADORES(),b); }
+function leerBorrador(id){ return leerLocal(BORRADORES(),{})[id] || null; }
+// los borradores de antes de las cuentas pasan a ser los anónimos
+try{
+  const viejos = localStorage.getItem('taller.borradores');
+  if(viejos){ if(!localStorage.getItem('taller.borradores.anonimo')) localStorage.setItem('taller.borradores.anonimo', viejos);
+              localStorage.removeItem('taller.borradores'); }
+}catch(e){}
 
 /* ---------- rutas dentro del objeto de datos ---------- */
 function fijar(obj, ruta, valor){
@@ -154,7 +162,7 @@ function campoHTML(c, ruta, esCabecera){
       return listaHTML(c, ruta);
     default:
       return `<div class="fld" data-fld="${esc(ruta)}"><label for="${id}">${esc(c.l)}</label>
-        <input type="text" id="${id}" data-path="${esc(ruta)}" value="${esc(v)}"${head}></div>`;
+        <input type="text" id="${id}" data-path="${esc(ruta)}" value="${esc(v)}"${head}>${pistaHTML(c)}</div>`;
   }
 }
 
@@ -274,8 +282,6 @@ panel.addEventListener('click', e=>{
     tocar(); aviso('Vuelve el fondo generado'); return;
   }
 
-  const accion = e.target.closest('[data-accion]');
-  if(accion){ if(accion.dataset.accion === 'importarNotion') importarNotion(); return; }
 
   const nueva = e.target.closest('[data-nueva-sec]');
   if(nueva){ agregarSeccion(nueva.dataset.nuevaSec, Number(nueva.dataset.pos)); return; }
@@ -325,7 +331,7 @@ function docVista(){ try{ return preview.contentDocument; }catch(e){ return null
 
 function apuntarGuardado(){
   guardarBorrador();
-  if(proyectoId){ clearTimeout(tGuard); tGuard = setTimeout(()=>guardar(true), 1400); }
+  if(proyectoId && cuenta.usuario){ clearTimeout(tGuard); tGuard = setTimeout(()=>guardar(true), 3000); }
 }
 function tocar(){
   clearTimeout(tPrev); tPrev = setTimeout(pintarVista, 200);
@@ -688,6 +694,7 @@ function menuSecciones(pos){
   const DESC = {
     nav:'Nombre del negocio, menú y botón de contacto', heroSplit:'Titular grande, texto y botón',
     tiras:'Tres o cuatro números que generan confianza', cards:'Productos o servicios con foto y precio',
+    tienda:'Productos con carrito; el pedido llega por WhatsApp',
     galeria:'Fotos del local, de trabajos, del equipo', precios:'Renglones con precio, agrupables',
     pasos:'Cómo se compra o se contrata, en orden', texto:'La historia del negocio con una foto',
     testimonios:'Comentarios de clientes', faq:'Preguntas frecuentes desplegables',
@@ -878,6 +885,15 @@ function abrirRubro(id, datos, pid, nombre){
 function pintarProyectos(items){
   const arr = items || almacen.cache || [];
   almacen.cache = arr;
+  if(!cuenta.usuario){
+    listaProj.innerHTML = cuenta.estado === 'listo'
+      ? `<p class="empty">Para guardar tus páginas, <button class="enlace" type="button" data-ingresar>ingresá</button>
+         o <button class="enlace" type="button" data-registrarse>creá una cuenta</button>.</p>`
+      : cuenta.estado === 'cargando' ? `<p class="empty">Cargando…</p>`
+      : `<p class="empty">Las cuentas no están disponibles acá. Exportá el HTML para no perder lo que hiciste.</p>`;
+    return;
+  }
+  if(almacen.cargando){ listaProj.innerHTML = `<p class="empty">Trayendo tus proyectos…</p>`; return; }
   listaProj.innerHTML = arr.length
     ? arr.map(p=>`<button class="proj" type="button" data-proj="${esc(p.id)}" aria-current="${p.id===proyectoId}">
         <b>${esc(p.nombre)}</b>
@@ -889,75 +905,146 @@ listaProj.addEventListener('click', async e=>{
   const del = e.target.closest('[data-del]');
   if(del){ e.stopPropagation(); await borrar(del.dataset.del); return; }
   const b = e.target.closest('[data-proj]'); if(!b) return;
-  const p = (almacen.cache||[]).find(x=>x.id===b.dataset.proj); if(!p) return;
-  abrirRubro(p.rubro, p.datos, p.id, p.nombre);
+  await abrirProyecto(b.dataset.proj);
   if(innerWidth<=1040) irA('vista');
 });
 
+/* una respuesta pedida por un usuario no se muestra si mientras tanto ingresó otro */
+const esDe = uid => (cuenta.usuario ? cuenta.usuario.id : null) === uid;
+
+async function abrirProyecto(id){
+  aviso('Abriendo…');
+  const uid = cuenta.usuario && cuenta.usuario.id;
+  try{
+    const p = await api('/api/proyectos?id=' + encodeURIComponent(id));
+    if(!esDe(uid)) return;
+    const datos = p.datos || {};
+    // los productos viven en su propia base de Notion
+    if(p.productos.length || (datos._secciones||[]).includes('tienda')) datos.productos = p.productos;
+    abrirRubro(p.rubro, datos, p.id, p.nombre);
+    aviso('Abierto: ' + p.nombre);
+  }catch(err){ aviso(explicarFalloDeRed(err)); }
+}
+
 /* =========================================================
-   ALMACENAMIENTO — nube del artefacto, o este navegador
+   ALMACENAMIENTO — en Notion, en la cuenta de quien ingresó
+   El diseño va a la base Proyectos y los productos de la tienda a la
+   base Productos (ver api/proyectos.js). Sin sesión no se guarda:
+   queda el borrador de este navegador.
    ========================================================= */
-const CLAVE_LOCAL = 'taller.proyectos';
+const CLAVE_LOCAL = 'taller.proyectos';     // donde se guardaban antes de las cuentas
 const almacen = {
   cache: [],
+  cargando: false,
   async init(){
-    try{ cap.db = window.claude?.use ? await claude.use('db') : null; }catch(e){ cap.db = null; }
     try{ cap.downloads = window.claude?.use ? await claude.use('downloads') : null; }catch(e){ cap.downloads = null; }
-    if(cap.db){
-      notaAlmacen.textContent = 'En la nube de esta página: tus proyectos te siguen a cualquier dispositivo donde abras este enlace.';
-      cap.db.collection('proyectos').orderBy('fecha','desc').limit(100).onSnapshot(
-        snap => {
-          const arr = snap.docs.map(d=>({id:d.id, ...d.data()}));
-          if(!arr.length){
-            const locales = leerLocal(CLAVE_LOCAL, []);
-            if(locales.length) locales.forEach(p => cap.db.doc('proyectos/'+p.id).set({
-              nombre:p.nombre, rubro:p.rubro, datos:p.datos, fecha:p.fecha
-            }).catch(()=>{}));
-          }
-          pintarProyectos(arr);
-        },
-        err => {
-          notaAlmacen.textContent = 'En este navegador. La nube no está disponible ahora mismo.';
-          cap.db = null; pintarProyectos(leerLocal(CLAVE_LOCAL, []));
-        }
-      );
-    }else{
-      notaAlmacen.textContent = 'En este navegador. Exportá el HTML para tener una copia que no dependa de acá.';
-      pintarProyectos(leerLocal(CLAVE_LOCAL, []));
+    cuenta.alCambiar = ()=> this.refrescar();
+    pintarProyectos([]);
+    await cuenta.iniciar();
+  },
+  dueno: undefined,
+  async refrescar(){
+    // cambió quién está usando el editor: lo que había en pantalla no se le muestra al siguiente
+    const uid = cuenta.usuario ? cuenta.usuario.id : null;
+    if(this.dueno === undefined ? uid !== null : this.dueno !== uid){
+      clearTimeout(tGuard); proyectoId = null; this.cache = [];
+      abrirRubro(TPL.id);
+      historial.length = 0; btnDeshacer.disabled = true;
     }
+    this.dueno = uid;
+    if(!cuenta.usuario){
+      proyectoId = null;
+      notaAlmacen.textContent = cuenta.estado === 'listo'
+        ? 'Sin ingresar, lo que editás queda sólo como borrador en este navegador.'
+        : 'Sin conexión con las cuentas: lo que editás queda como borrador en este navegador.';
+      pintarProyectos([]);
+      return;
+    }
+    notaAlmacen.innerHTML = `En Notion, en la cuenta <b>${esc(cuenta.nombre)}</b>. Los productos de la tienda van a la base Productos.`;
+    this.cargando = true; pintarProyectos([]);
+    try{
+      const { proyectos } = await api('/api/proyectos');
+      if(!esDe(uid)) return;
+      this.cargando = false; pintarProyectos(proyectos);
+    }catch(err){
+      this.cargando = false; pintarProyectos([]);
+      aviso(explicarFalloDeRed(err));
+    }
+    ofrecerMigracion();
   }
 };
 
-async function guardar(silencioso){
-  const nombre = inpNombre.value.trim() || 'Página sin título';
-  if(!proyectoId) proyectoId = 'p' + Date.now().toString(36) + Math.random().toString(36).slice(2,6);
-  const cuerpo = { nombre, rubro:TPL.id, datos:clonar(D), fecha:Date.now() };
-  if(cap.db){
-    try{ await cap.db.doc('proyectos/'+proyectoId).set(cuerpo); }
-    catch(err){
-      const c = err && err.code;
-      aviso(c==='quota_exceeded' ? 'Se llenó el espacio: borrá algún proyecto viejo.'
-          : c==='invalid_argument' ? 'No tenés permiso para guardar en esta página.'
-          : 'No se pudo guardar. Probá de nuevo.');
-      return;
+/* los proyectos que quedaron en este navegador de antes de las cuentas */
+function ofrecerMigracion(){
+  const locales = leerLocal(CLAVE_LOCAL, []);
+  if(!locales.length || !cuenta.usuario) return;
+  const p = document.createElement('p');
+  p.className = 'empty';
+  p.innerHTML = `Hay ${locales.length} proyecto(s) guardados sólo en este navegador.
+    <button class="enlace" type="button">Pasarlos a mi cuenta</button>`;
+  p.querySelector('button').addEventListener('click', async ()=>{
+    p.textContent = 'Pasando…';
+    const quedan = [];
+    for(const lp of locales){
+      try{
+        const { productos = null, ...datos } = lp.datos || {};
+        await api('/api/proyectos', { method:'POST', body:{ nombre:lp.nombre, rubro:lp.rubro, datos, productos } });
+      }catch(err){ quedan.push(lp); }
     }
-  }else{
-    const arr = leerLocal(CLAVE_LOCAL, []).filter(p=>p.id!==proyectoId);
-    arr.unshift({id:proyectoId, ...cuerpo});
-    escribirLocal(CLAVE_LOCAL, arr);
-    pintarProyectos(arr);
+    escribirLocal(CLAVE_LOCAL, quedan);
+    aviso(quedan.length ? `No se pudieron pasar ${quedan.length}. Probá de nuevo.` : 'Proyectos pasados a tu cuenta');
+    almacen.refrescar();
+  });
+  notaAlmacen.after(p);
+}
+
+let guardando = null, guardarOtraVez = false;
+
+async function guardar(silencioso){
+  if(!cuenta.usuario){
+    if(!silencioso){ aviso('Ingresá para guardar tus proyectos'); cuenta.ingresar(); }
+    return;
   }
-  if(!silencioso) aviso('Proyecto guardado');
+  // un guardado a la vez: si llega otro mientras tanto, se hace al terminar
+  if(guardando){ guardarOtraVez = true; return guardando; }
+
+  // cada producto lleva una clave propia para saber qué fila de Notion le toca;
+  // un producto duplicado en el editor trae la clave del original y pasa a ser nuevo
+  const vistas = new Set();
+  (D.productos||[]).forEach(p=>{
+    if(!p._k || vistas.has(p._k)){ p._k = Math.random().toString(36).slice(2,10); delete p._nid; }
+    vistas.add(p._k);
+  });
+  const { productos = null, ...datos } = clonar(D);
+  const cuerpo = { id:proyectoId, nombre:inpNombre.value.trim() || 'Página sin título', rubro:TPL.id, datos, productos };
+
+  const uid = cuenta.usuario.id;
+  guardando = api('/api/proyectos', { method:'POST', body:cuerpo }).then(r=>{
+    if(!esDe(uid)) return;
+    proyectoId = r.id;
+    (D.productos||[]).forEach(p=>{ if(r.ids[p._k]) p._nid = r.ids[p._k]; });
+    guardarBorrador();
+    const resto = almacen.cache.filter(p=>p.id !== r.id);
+    pintarProyectos([{ id:r.id, nombre:cuerpo.nombre, rubro:cuerpo.rubro, actualizado:r.actualizado }, ...resto]);
+    if(!silencioso) aviso('Guardado en Notion');
+  }).catch(err=>{
+    aviso(err.status === 401 ? 'Tu sesión venció: ingresá de nuevo.' : 'No se pudo guardar: ' + explicarFalloDeRed(err));
+  }).finally(()=>{
+    guardando = null;
+    if(guardarOtraVez){ guardarOtraVez = false; if(esDe(uid)) guardar(true); }
+  });
+  return guardando;
 }
 
 async function borrar(id){
-  if(cap.db){ try{ await cap.db.doc('proyectos/'+id).delete(); }catch(e){} }
-  else{
-    const arr = leerLocal(CLAVE_LOCAL, []).filter(p=>p.id!==id);
-    escribirLocal(CLAVE_LOCAL, arr); pintarProyectos(arr);
-  }
-  if(id===proyectoId) proyectoId = null;
-  aviso('Proyecto borrado');
+  const p = almacen.cache.find(x=>x.id===id);
+  if(!confirm(`¿Borrar «${p ? p.nombre : 'este proyecto'}» y sus productos? Quedan 30 días en la papelera de Notion.`)) return;
+  try{
+    await api('/api/proyectos?id=' + encodeURIComponent(id), { method:'DELETE' });
+    if(id===proyectoId) proyectoId = null;
+    pintarProyectos(almacen.cache.filter(x=>x.id!==id));
+    aviso('Proyecto borrado');
+  }catch(err){ aviso('No se pudo borrar: ' + explicarFalloDeRed(err)); }
 }
 
 /* =========================================================
@@ -1034,7 +1121,7 @@ $('#btn-new').addEventListener('click', ()=>{
   pintarPanel(); pintarVista(); pintarProyectos();
   aviso('Plantilla reiniciada');
 });
-inpNombre.addEventListener('input', ()=>{ if(proyectoId){ clearTimeout(tGuard); tGuard = setTimeout(()=>guardar(true),1400); } });
+inpNombre.addEventListener('input', apuntarGuardado);
 
 const CLAVE_TEMA = 'taller.tema';
 function aplicarTema(t){
@@ -1071,7 +1158,7 @@ function explicarFalloDeRed(err){
   if(err instanceof TypeError){
     return EN_VISOR
       ? 'El visor de Claude bloquea las conexiones externas. Esto funciona en el sitio publicado.'
-      : 'No se pudo conectar con la API. Revisá la dirección en «Catálogo desde Notion».';
+      : 'No se pudo conectar con el servidor. Revisá tu conexión.';
   }
   return String(err.message || err);
 }
@@ -1179,7 +1266,6 @@ async function achicar(archivo){
 const inputArchivo = $('#archivo-img');
 let rutaSubida = null;
 
-function apiBase(){ return String(D._apiBase || '').replace(/\/+$/, ''); }
 function pedirArchivo(ruta){ rutaSubida = ruta; inputArchivo.click(); }
 
 inputArchivo.addEventListener('change', ()=>{
@@ -1223,30 +1309,6 @@ async function subirImagen(archivo, ruta){
   }
 }
 
-async function importarNotion(){
-  const base = apiBase();
-  const db = String(D._notionDb || '').trim().replace(/-/g, '');
-  if(!base){ aviso('Falta la dirección de la API.'); return; }
-  if(!/^[0-9a-f]{32}$/i.test(db)){ aviso('El ID de la base de Notion tiene que ser de 32 caracteres.'); return; }
-
-  aviso('Consultando Notion…');
-  try{
-    const r = await fetch(`${base}/api/catalogo?db=${encodeURIComponent(db)}&moneda=${encodeURIComponent(D._moneda || '')}`);
-    const j = await r.json().catch(()=>({}));
-    if(!r.ok) throw new Error(j.error || 'Notion no respondió.');
-    if(!j.productos || !j.productos.length) throw new Error('La base no devolvió productos visibles.');
-
-    D.cards = j.productos.map(p => ({
-      titulo: p.titulo || '', meta: p.meta || '', texto: p.texto || '', img: p.img || ''
-    }));
-    limpiarSeleccion();
-    pintarPanel(); pintarVista(); apuntarGuardado();
-    aviso(`Importados ${j.productos.length} productos de Notion`);
-  }catch(err){
-    aviso(explicarFalloDeRed(err));
-  }
-}
-
 /* =========================================================
    PUBLICAR DEMO EN VERCEL
    /api/publicar crea un proyecto demo-<nombre> por demo y le sube
@@ -1257,6 +1319,8 @@ const CLAVE_PUBLICAR = 'taller.clavePublicar';
 const nombreDemo = s => slug(String(s || '').replace(/^demo-/, '')).slice(0, 47).replace(/-+$/, '');
 
 function abrirPublicar(){
+  // cada dirección de demo queda a nombre de un proyecto de tu cuenta
+  if(!cuenta.usuario){ aviso('Ingresá para publicar demos'); cuenta.ingresar(); return; }
   const veil = document.createElement('div');
   veil.className = 'veil';
   veil.innerHTML = `<div class="sheet" role="dialog" aria-modal="true" aria-label="Publicar demo" style="width:min(520px,100%)">
@@ -1312,26 +1376,31 @@ function abrirPublicar(){
     const base = apiBase();
     if(!nombre){ aviso('Poné un nombre para la dirección.'); return; }
     if(!clave){ aviso('Falta la clave de publicación.'); return; }
-    if(!base){ aviso('Falta la dirección de la API, en «Catálogo desde Notion».'); return; }
     inNombre.value = nombre;
     escribirLocal(CLAVE_PUBLICAR, clave);
 
     btn.disabled = true; btn.textContent = 'Publicando…';
     try{
+      // la demo se publica desde un proyecto guardado: así la dirección queda a su nombre
+      const uid = cuenta.usuario && cuenta.usuario.id;
+      if(!proyectoId){ btn.textContent = 'Guardando…'; await guardar(true); }
+      if(!proyectoId || !esDe(uid)) throw new Error('Guardá el proyecto antes de publicarlo.');
       const usadas = imagenes.usadas(D);
       const perdidas = usadas.filter(n=>!imagenes.reg[n]);
       if(perdidas.length) throw new Error(`Hay ${perdidas.length} imagen(es) que no están en este navegador. Volvé a subirlas o quitalas.`);
       const archivos = usadas.map(n=>({ file:n, sha:imagenes.reg[n].sha, size:imagenes.reg[n].blob.size }));
 
       const enviar = async cuerpo => {
+        const token = await cuenta.token();
+        if(!token || !esDe(uid)) throw new Error('Cambió la sesión. Ingresá de nuevo para publicar.');
         const r = await fetch(base + '/api/publicar', {
           method:'POST',
-          headers:{ 'Content-Type':'application/json', 'x-publicar-token':clave },
+          headers:{ 'Content-Type':'application/json', 'x-publicar-token':clave, Authorization:'Bearer ' + token },
           body: JSON.stringify(cuerpo)
         });
         return { r, j: await r.json().catch(()=>({})) };
       };
-      const cuerpo = { proyecto:nombre, html:renderDoc(TPL, D), archivos };
+      const cuerpo = { proyecto:nombre, proyectoId, html:renderDoc(TPL, D), archivos };
       let { r, j } = await enviar(cuerpo);
 
       // Vercel pide sólo las imágenes que todavía no tiene; se suben de a una y se reintenta.

@@ -7,7 +7,7 @@
    que la capa de edición usa para saber qué toca cada clic; al
    exportar devuelve cadenas vacías, así el HTML sale limpio.
    ========================================================= */
-const ANCLAS = { cards:'#catalogo', precios:'#precios', texto:'#nosotros', faq:'#preguntas', contacto:'#contacto', galeria:'#galeria' };
+const ANCLAS = { cards:'#catalogo', tienda:'#tienda', precios:'#precios', texto:'#nosotros', faq:'#preguntas', contacto:'#contacto', galeria:'#galeria' };
 
 function marcas(activo){
   const q = s => String(s).replace(/"/g,'&quot;');
@@ -136,23 +136,11 @@ const SEC = {
         nuevo:{titulo:'Ítem nuevo',meta:'',texto:'',img:''},
         item:[{k:'titulo',l:'Título',t:'text'},{k:'meta',l:'Dato destacado (precio, medida, duración)',t:'text'},
               {k:'texto',l:'Descripción',t:'textarea'},{k:'img',l:'Imagen',t:'img'}]},
-
-      {k:'_notionDb',   g:'Catálogo desde Notion', l:'ID de la base de Notion', t:'text',
-        pista:'Está en la URL de la base: notion.so/…/<32 caracteres>?v=…'},
-      {k:'_notionVivo', g:'Catálogo desde Notion', l:'Leer Notion cada vez que alguien abre la página', t:'check',
-        pista:'Apagado: los productos quedan escritos en el HTML y la página no depende de nada.'},
-      {k:'_moneda',     g:'Catálogo desde Notion', l:'Prefijo del precio', t:'text',
-        pista:'Se usa sólo si en Notion el precio es un número. Si lo escribís como texto, se respeta tal cual.'},
-      {k:'_apiBase',    g:'Catálogo desde Notion', l:'Dirección de la API', t:'text',
-        pista:'El despliegue de Vercel que guarda las claves de Notion y publica las demos.'},
-      {k:'_importar',   g:'Catálogo desde Notion', l:'', t:'accion',
-        texto:'Importar productos ahora', accion:'importarNotion',
-        pista:'Trae los productos de Notion y reemplaza la lista de arriba.'},
     ],
     html:(d,t,a)=>`
 <section class="sec" id="catalogo"><div class="wrap">
   <div class="sec-h"><h2${a.c('cardsTitulo')}>${esc(d.cardsTitulo)}</h2>${d.cardsIntro||a.on?`<p${a.c('cardsIntro')}>${esc(d.cardsIntro)}</p>`:''}</div>
-  <div class="rejilla ${esc(d._cardStyle||'grid')}" data-catalogo>
+  <div class="rejilla ${esc(d._cardStyle||'grid')}">
     ${(d.cards||[]).map((c,i)=>`
     <article class="tarj"${a.it(`cards.${i}`)}>
       ${media(c.img,t,i+1,'',a.im(`cards.${i}.img`))}
@@ -164,6 +152,65 @@ const SEC = {
     </article>`).join('')}
   </div>
 </div></section>`
+  },
+
+  /* tienda: el catálogo con carrito. El carrito vive en el guion de
+     guionTienda(): en edición no se incluye, así cada clic edita. */
+  tienda: {
+    nombre:'Tienda con carrito',
+    nuevo:{ tiendaTitulo:'Tienda', tiendaIntro:'Elegí lo que querés, armá tu pedido y lo confirmamos por WhatsApp.',
+      tiendaEnvio:'Gs. 20.000', tiendaGratis:'Gs. 300.000', tiendaPagos:'Efectivo, Transferencia, Tigo Money',
+      productos:[{titulo:'Producto uno',precio:'Gs. 100.000',texto:'Una línea que cuente qué es.',categoria:'General',etiqueta:'Nuevo',img:''},
+                 {titulo:'Producto dos',precio:'Gs. 150.000',texto:'Una línea que cuente qué es.',categoria:'General',etiqueta:'',img:''},
+                 {titulo:'Producto tres',precio:'Gs. 200.000',texto:'Una línea que cuente qué es.',categoria:'General',etiqueta:'',img:''}] },
+    campos:[
+      {k:'tiendaTitulo',g:'Tienda',l:'Título de la sección',t:'text'},
+      {k:'tiendaIntro', g:'Tienda',l:'Bajada',t:'textarea'},
+      {k:'productos',   g:'Tienda',l:'Productos',t:'lista',add:'Agregar producto',
+        nuevo:{titulo:'Producto nuevo',precio:'Gs. 0',texto:'',categoria:'',etiqueta:'',img:''},
+        item:[{k:'titulo',l:'Nombre',t:'text'},{k:'precio',l:'Precio',t:'text',pista:'Sin número (ej. «A consultar») el botón pasa a consultar por WhatsApp.'},
+              {k:'texto',l:'Descripción',t:'textarea'},{k:'categoria',l:'Categoría',t:'text',pista:'Con dos o más categorías aparecen los filtros.'},
+              {k:'etiqueta',l:'Etiqueta',t:'text',pista:'Nuevo, Oferta… «Agotado» no deja agregarlo al carrito.'},{k:'img',l:'Foto',t:'img'}]},
+      {k:'tiendaEnvio', g:'Pedido',l:'Costo de envío',t:'text',pista:'Vacío: sólo retiro en el local.'},
+      {k:'tiendaGratis',g:'Pedido',l:'Envío gratis desde',t:'text',pista:'Vacío: el envío siempre se cobra.'},
+      {k:'tiendaPagos', g:'Pedido',l:'Formas de pago del pedido',t:'text',pista:'Separadas por coma; salen como opciones en el carrito.'},
+      {k:'whatsapp',    g:'Pedido',l:'WhatsApp que recibe los pedidos',t:'text'},
+      {k:'_moneda',     g:'Pedido',l:'Moneda de los totales',t:'text',pista:'El prefijo del subtotal y el total del carrito, ej. Gs. o USD.'},
+    ],
+    html:(d,t,a)=>{
+      const prods = d.productos || [];
+      const cats = [...new Set(prods.map(p => String(p.categoria||'').trim()).filter(Boolean))];
+      return `
+<section class="sec" id="tienda"><div class="wrap">
+  <div class="sec-h"><h2${a.c('tiendaTitulo')}>${esc(d.tiendaTitulo)}</h2>${d.tiendaIntro||a.on?`<p${a.c('tiendaIntro')}>${esc(d.tiendaIntro)}</p>`:''}</div>
+  ${cats.length > 1 ? `<div class="filtros" role="group" aria-label="Filtrar por categoría">
+    <button type="button" class="chip on" data-filtro="">Todo</button>${cats.map(c=>`<button type="button" class="chip" data-filtro="${esc(c)}">${esc(c)}</button>`).join('')}
+  </div>` : ''}
+  <div class="rejilla grid tienda">
+    ${prods.map((p,i)=>{
+      const agotado = /^agotad/i.test(String(p.etiqueta||'').trim());
+      const conPrecio = /\d/.test(p.precio||'');
+      return `
+    <article class="tarj prod"${a.it(`productos.${i}`)} data-cat="${esc(String(p.categoria||'').trim())}">
+      <div class="foto">
+        ${media(p.img,t,i+1,'',a.im(`productos.${i}.img`))}
+        ${p.etiqueta||a.on?`<span class="etq${agotado?' agot':''}"${a.c(`productos.${i}.etiqueta`)}>${esc(p.etiqueta)}</span>`:''}
+      </div>
+      <div class="cuerpo">
+        ${a.on?`<small class="cat"${a.c(`productos.${i}.categoria`)}>${esc(p.categoria)}</small>`:''}
+        <h3${a.c(`productos.${i}.titulo`)}>${esc(p.titulo)}</h3>
+        ${p.texto||a.on?`<p${a.c(`productos.${i}.texto`)}>${esc(p.texto)}</p>`:''}
+        <div class="compra">
+          <span class="meta"${a.c(`productos.${i}.precio`)}>${esc(p.precio)}</span>
+          ${agotado ? `<button type="button" class="btn chico" disabled>Agotado</button>`
+            : conPrecio ? `<button type="button" class="btn chico" data-agregar="${i}">Agregar</button>`
+            : `<a class="btn chico alt" href="${wa(d.whatsapp,'Hola '+d.marca+', quiero consultar por '+p.titulo+'.')}">Consultar</a>`}
+        </div>
+      </div>
+    </article>`;}).join('')}
+  </div>
+</div></section>`;
+    }
   },
 
   precios: {
@@ -370,7 +417,7 @@ const SEC = {
 
 /* secciones que se pueden agregar, una por familia (las portadas son variantes de una) */
 const FAMILIA = n => (SEC[n] && SEC[n].familia) || n;
-const CATALOGO_SECCIONES = ['nav','heroSplit','tiras','cards','galeria','precios','pasos','texto','testimonios','faq','contacto','pie'];
+const CATALOGO_SECCIONES = ['nav','heroSplit','tiras','cards','tienda','galeria','precios','pasos','texto','testimonios','faq','contacto','pie'];
 const VARIANTES_PORTADA = ['heroSplit','heroBanner','heroTipo'];
 
 /* campos de estilo, comunes a todos los rubros */
@@ -391,7 +438,7 @@ const CAMPOS_ESTILO = [
 /* valores de estilo que todo rubro hereda si no los define */
 const ESTILO_POR_DEFECTO = {
   _escala:1, _radio:14, _aire:1,
-  _notionDb:'', _notionVivo:false, _moneda:'Gs.',
+  _moneda:'Gs.',
   _apiBase:'https://tiendita-ebon-one.vercel.app',
 };
 
@@ -432,39 +479,161 @@ function capaEditorCss(){ return `
 .tp-soltar{outline:3px solid #16A34A !important;outline-offset:-3px}
 `; }
 
-/* ---------- catálogo leído de Notion en cada visita ----------
-   Los productos que ya están escritos en el HTML quedan como respaldo:
-   si Notion tarda o falla, la página igual muestra algo. */
-function guionCatalogo(d){
-  if(!(d._notionVivo && d._notionDb)) return '';
-  const api = String(d._apiBase || '').replace(/\/+$/,'');
-  if(!api) return '';
-  const url = api + '/api/catalogo?db=' + encodeURIComponent(String(d._notionDb).replace(/-/g,''))
-            + '&moneda=' + encodeURIComponent(d._moneda || '');
+/* ---------- carrito de la tienda ----------
+   Arma el pedido en el navegador del visitante y lo manda por WhatsApp.
+   No hay pasarela de pago: el negocio confirma el pedido y cobra como
+   ya cobra. El carrito queda en localStorage para no perderlo al recargar. */
+const numeroPrecio = s => { const n = String(s||'').replace(/\D/g,''); return n ? Number(n) : 0; };
+
+function guionTienda(d){
+  const n = String(d.whatsapp||'').replace(/\D/g,'');
+  const datos = {
+    marca: d.marca || '',
+    wa: n ? (n.startsWith('595') ? n : '595' + n.replace(/^0+/,'')) : '',
+    moneda: d._moneda || 'Gs.',
+    envio: String(d.tiendaEnvio||'').trim() ? numeroPrecio(d.tiendaEnvio) : null,
+    gratis: numeroPrecio(d.tiendaGratis),
+    pagos: String(d.tiendaPagos||'').split(',').map(s=>s.trim()).filter(Boolean),
+    productos: (d.productos||[]).map(p => ({ t: p.titulo||'', p: numeroPrecio(p.precio) })),
+  };
+  const json = JSON.stringify(datos).replace(/</g,'\\u003c');
   return `
+<button type="button" class="carro-btn" hidden aria-label="Ver carrito">
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 7h12l-1 13H7L6 7z"/><path d="M9 7a3 3 0 0 1 6 0"/></svg>
+  <span>Carrito</span><b class="carro-n">0</b>
+</button>
+<div class="carro-velo" hidden></div>
+<aside class="carro" hidden aria-label="Carrito">
+  <div class="carro-h"><h3>Tu pedido</h3><button type="button" class="carro-x" aria-label="Cerrar">✕</button></div>
+  <div class="carro-lineas"></div>
+  <form class="carro-form">
+    <div class="carro-tot"></div>
+    <label>Nombre<input name="nombre" required autocomplete="name"></label>
+    <label class="carro-entrega">Entrega<select name="entrega"><option>Envío a domicilio</option><option>Retiro en el local</option></select></label>
+    <label class="carro-dir">Dirección<input name="direccion" autocomplete="street-address"></label>
+    <label class="carro-pago">Pago<select name="pago"></select></label>
+    <label>Notas<textarea name="notas" rows="2" placeholder="Talle, color, horario de entrega…"></textarea></label>
+    <button type="submit" class="btn">Enviar pedido por WhatsApp</button>
+    <button type="button" class="carro-vaciar">Vaciar carrito</button>
+  </form>
+</aside>
+<div class="carro-aviso" role="status" aria-live="polite"></div>
 <script>
 (function(){
-  var cont = document.querySelector('[data-catalogo]');
-  if(!cont || !window.fetch) return;
+  var D = ${json};
+  var CLAVE = 'carrito:' + D.marca, items = {};
+  var $ = function(s){ return document.querySelector(s); };
   function e(s){ return String(s == null ? '' : s).replace(/[&<>"]/g, function(c){
-    return { '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;' }[c];
-  }); }
-  function tarjeta(p){
-    var medio = p.img ? '<img src="' + e(p.img) + '" alt="" loading="lazy">'
-                      : '<div class="arte arte-auto"></div>';
-    return '<article class="tarj">' + medio + '<div class="cuerpo">'
-      + '<h3>' + e(p.titulo) + '</h3>'
-      + (p.meta  ? '<div class="meta">' + e(p.meta) + '</div>' : '')
-      + (p.texto ? '<p>' + e(p.texto) + '</p>' : '')
-      + '</div></article>';
+    return { '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;' }[c]; }); }
+  function plata(n){ return D.moneda + ' ' + String(n).replace(/\\B(?=(\\d{3})+(?!\\d))/g, '.'); }
+  try{ items = JSON.parse(localStorage.getItem(CLAVE)) || {}; }catch(_){}
+  // si el catálogo cambió, se descarta lo que ya no coincide
+  Object.keys(items).forEach(function(i){
+    var p = D.productos[i];
+    if(!p || p.t !== items[i].t || !p.p) delete items[i];
+  });
+
+  var btn = $('.carro-btn'), velo = $('.carro-velo'), panel = $('.carro'), form = $('.carro-form');
+  form.pago.innerHTML = D.pagos.map(function(p){ return '<option>' + e(p) + '</option>'; }).join('');
+  $('.carro-pago').hidden = !D.pagos.length;
+  if(D.envio === null){ $('.carro-entrega').hidden = true; form.entrega.value = 'Retiro en el local'; }
+
+  function guardar(){ try{ localStorage.setItem(CLAVE, JSON.stringify(items)); }catch(_){} }
+  function cuentas(){
+    var sub = 0, cant = 0;
+    Object.keys(items).forEach(function(i){ sub += D.productos[i].p * items[i].c; cant += items[i].c; });
+    var retiro = form.entrega.value === 'Retiro en el local';
+    var envio = retiro || D.envio === null ? 0 : (D.gratis && sub >= D.gratis ? 0 : D.envio);
+    return { sub:sub, cant:cant, envio:envio, retiro:retiro, total:sub + envio };
   }
-  fetch(${JSON.stringify(url)}, { headers: { Accept: 'application/json' } })
-    .then(function(r){ return r.ok ? r.json() : null; })
-    .then(function(d){
-      if(!d || !d.productos || !d.productos.length) return;  // se queda el respaldo
-      cont.innerHTML = d.productos.map(tarjeta).join('');
-    })
-    .catch(function(){});
+  function pintar(){
+    var k = cuentas(), ids = Object.keys(items);
+    btn.hidden = !k.cant;
+    $('.carro-n').textContent = k.cant;
+    $('.carro-lineas').innerHTML = ids.length ? ids.map(function(i){
+      var p = D.productos[i], c = items[i].c;
+      return '<div class="linea"><div><b>' + e(p.t) + '</b><small>' + plata(p.p) + ' c/u</small></div>'
+        + '<div class="cant"><button type="button" data-mas="' + i + '" data-d="-1" aria-label="Uno menos">−</button>'
+        + '<span>' + c + '</span><button type="button" data-mas="' + i + '" data-d="1" aria-label="Uno más">+</button></div>'
+        + '<b class="sub">' + plata(p.p * c) + '</b></div>';
+    }).join('') : '<p class="carro-vacio">Todavía no agregaste nada.</p>';
+    form.hidden = !ids.length;
+    $('.carro-dir').hidden = k.retiro;
+    form.direccion.required = !k.retiro;
+    var falta = D.gratis && !k.retiro && D.envio && k.sub < D.gratis ? D.gratis - k.sub : 0;
+    $('.carro-tot').innerHTML = '<div><span>Subtotal</span><b>' + plata(k.sub) + '</b></div>'
+      + (k.retiro ? '' : '<div><span>Envío</span><b>' + (k.envio ? plata(k.envio) : 'Gratis') + '</b></div>')
+      + (falta ? '<p>Te faltan ' + plata(falta) + ' para el envío gratis.</p>' : '')
+      + '<div class="total"><span>Total</span><b>' + plata(k.total) + '</b></div>';
+  }
+  var tAviso;
+  function aviso(t){
+    var a = $('.carro-aviso'); a.textContent = t; a.classList.add('on');
+    clearTimeout(tAviso); tAviso = setTimeout(function(){ a.classList.remove('on'); }, 1800);
+  }
+  function abrir(si){
+    panel.hidden = velo.hidden = !si;
+    document.body.style.overflow = si ? 'hidden' : '';
+    if(si) panel.querySelector('.carro-x').focus();
+  }
+
+  document.addEventListener('click', function(ev){
+    var t = ev.target.closest ? ev.target : ev.target.parentNode;
+    var ag = t.closest('[data-agregar]');
+    if(ag){
+      var i = ag.dataset.agregar, p = D.productos[i];
+      items[i] = { t:p.t, c:(items[i] ? items[i].c : 0) + 1 };
+      guardar(); pintar(); aviso('Agregado: ' + p.t);
+      btn.classList.remove('salto'); void btn.offsetWidth; btn.classList.add('salto');
+      return;
+    }
+    var mas = t.closest('[data-mas]');
+    if(mas){
+      var j = mas.dataset.mas;
+      items[j].c += Number(mas.dataset.d);
+      if(items[j].c < 1) delete items[j];
+      guardar(); pintar();
+      if(!Object.keys(items).length) abrir(false);
+      return;
+    }
+    var f = t.closest('[data-filtro]');
+    if(f){
+      document.querySelectorAll('[data-filtro]').forEach(function(b){ b.classList.toggle('on', b === f); });
+      document.querySelectorAll('.prod').forEach(function(a){
+        a.hidden = !!f.dataset.filtro && a.dataset.cat !== f.dataset.filtro;
+      });
+    }
+  });
+  btn.addEventListener('click', function(){ abrir(true); });
+  velo.addEventListener('click', function(){ abrir(false); });
+  panel.querySelector('.carro-x').addEventListener('click', function(){ abrir(false); });
+  document.addEventListener('keydown', function(ev){ if(ev.key === 'Escape' && !panel.hidden) abrir(false); });
+  form.entrega.addEventListener('change', pintar);
+  $('.carro-vaciar').addEventListener('click', function(){ items = {}; guardar(); pintar(); abrir(false); });
+
+  form.addEventListener('submit', function(ev){
+    ev.preventDefault();
+    var k = cuentas(), v = form.elements;
+    var renglones = Object.keys(items).map(function(i){
+      var p = D.productos[i];
+      return '• ' + items[i].c + ' × ' + p.t + ' — ' + plata(p.p * items[i].c);
+    });
+    var msg = ['Hola ' + D.marca + ', quiero hacer este pedido:', ''].concat(renglones, [
+      '',
+      'Subtotal: ' + plata(k.sub),
+      k.retiro ? 'Retiro en el local' : 'Envío: ' + (k.envio ? plata(k.envio) : 'gratis'),
+      'Total: ' + plata(k.total),
+      '',
+      'Nombre: ' + v.nombre.value.trim(),
+      k.retiro ? null : 'Dirección: ' + v.direccion.value.trim(),
+      D.pagos.length ? 'Pago: ' + v.pago.value : null,
+      v.notas.value.trim() ? 'Notas: ' + v.notas.value.trim() : null,
+    ]).filter(function(x){ return x !== null; }).join('\\n');
+    if(!D.wa){ aviso('Falta cargar el WhatsApp del negocio'); return; }
+    window.open('https://wa.me/' + D.wa + '?text=' + encodeURIComponent(msg), '_blank');
+  });
+
+  pintar();
 })();
 <\/script>`;
 }
@@ -497,7 +666,7 @@ function renderDoc(tpl, d, editable){
 </head>
 <body>
 ${cuerpo}
-${guionCatalogo(d)}
+${!editable && seccionesDe(tpl, d).includes('tienda') ? guionTienda(d) : ''}
 </body>
 </html>`;
 }

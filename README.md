@@ -14,6 +14,7 @@ facturación a RUC y medios de pago locales (Tigo Money, Billetera Personal, Zim
 |---|---|
 | Gastronomía | Restaurante, parrillada, comedor |
 | Moda y textil | Tienda de ropa, boutique |
+| Tienda online | Catálogo con carrito, pedidos por WhatsApp |
 | Belleza | Barbería, peluquería, estética |
 | Inmobiliaria | Venta, alquiler, loteamientos |
 | Agro y ganadería | Insumos, campos, servicios rurales |
@@ -57,6 +58,28 @@ visitante, con los enlaces y las preguntas desplegables funcionando.
 Las marcas que hacen posible todo esto (`data-campo`, `data-item`, `data-sec`)
 existen sólo en la vista previa. El HTML exportado sale sin ellas.
 
+## Tienda con carrito
+
+La sección **Tienda con carrito** (viene en el rubro *Tienda online* y se puede
+agregar a cualquier página con **＋ Sección**) convierte el catálogo en una tienda:
+
+- Cada producto tiene nombre, precio, descripción, foto, **categoría** y
+  **etiqueta**. Con dos o más categorías aparecen filtros arriba de la grilla.
+- La etiqueta *Agotado* deja el producto a la vista pero sin botón de compra.
+  Un precio sin número (*A consultar*) cambia el botón por *Consultar* en WhatsApp.
+- El visitante agrega productos, ajusta cantidades en el carrito lateral, elige
+  envío o retiro y forma de pago, y **manda el pedido por WhatsApp** con el
+  detalle, el subtotal, el envío y el total ya calculados.
+- En **Datos** de la sección: costo de envío (vacío = sólo retiro), monto para
+  envío gratis, formas de pago y el WhatsApp que recibe los pedidos.
+- El carrito se guarda en el `localStorage` del visitante, así no se pierde al
+  recargar. Si el catálogo cambia, se descartan los productos que ya no existen.
+
+No hay cobro en línea: el negocio confirma stock y cobra como ya lo hace. Es la
+única sección, junto con el catálogo vivo de Notion, que suma un script a la
+página exportada; en modo **Editar** el script no se carga, para que cada clic
+siga editando.
+
 ## Controles visuales
 
 - **Zoom** con `−` / `+` / *Ajustar*, y anchos reales de escritorio (1280 px),
@@ -84,9 +107,13 @@ index.html          Cáscara de la aplicación y marcado del editor
 css/taller.css      Estilos del editor (claro y oscuro)
 js/motor.js         Utilidades, tipografías, paletas, fondos generados, CSS de las páginas
 js/secciones.js     Secciones reutilizables, sus campos y el armado del documento final
-js/rubros.js        Los 14 rubros con su contenido de arranque
+js/rubros.js        Los 15 rubros con su contenido de arranque
+js/cuenta.js        Ingreso con Clerk y pedidos a la API
 js/app.js           Panel, edición directa, zoom, imágenes, guardado, exportación y publicación
-api/catalogo.js     Lee la base de productos de Notion y la normaliza
+api/proyectos.js    Proyectos y productos de cada usuario, en Notion
+api/config.js       Clave publicable de Clerk para el editor
+api/_sesion.js      Verifica la sesión de Clerk
+api/_notion.js      Acceso a las bases de Notion
 api/publicar.js     Publica una demo como proyecto propio en Vercel
 api/_comun.js       CORS y utilidades compartidas
 tools/build-artifact.mjs   Arma el archivo único que consume el Artifact de Claude
@@ -107,7 +134,7 @@ El editor es estático. Para levantarlo solo, sin las funciones de la API:
 python3 -m http.server 8777
 ```
 
-Para trabajar **también** con `/api/publicar` y `/api/catalogo`, hace falta el
+Para trabajar **también** con la API (cuentas, proyectos, publicar), hace falta el
 entorno de Vercel, que carga las variables:
 
 ```bash
@@ -115,55 +142,46 @@ vercel env pull        # trae las variables a .env.local
 vercel dev             # editor + API en http://localhost:3000
 ```
 
-## Catálogo en Notion
+## Cuentas y proyectos
 
-El editor puede traer los productos de una base de Notion. El token vive del
-lado del servidor, en `api/catalogo.js`.
+Para guardar hay que **ingresar**. Las cuentas (usuario y contraseña) las maneja
+[Clerk](https://clerk.com), instalado desde el Marketplace de Vercel; los datos
+viven en Notion, en **dos bases compartidas por todos los proyectos**:
+
+| Base | Qué guarda | Variable |
+|---|---|---|
+| **Proyectos** | Una fila por proyecto: nombre, rubro, dueño (`Usuario` = id de Clerk), el diseño en JSON (`Datos`) y la demo publicada | `NOTION_DB_PROYECTOS` |
+| **Productos** | Una fila por producto de la tienda, con relación a su proyecto: nombre, precio, descripción, imagen, categoría, etiqueta, orden y visible | `NOTION_DB_PRODUCTOS` |
 
 ```
-página     ──GET /api/catalogo?db=…──►  Vercel  ──token de Notion──►  Notion
+editor ──token de sesión de Clerk──► /api/proyectos ──verifica el token──► Notion
+                                      (sólo tus proyectos)
 ```
+
+- **Cada usuario ve sólo lo suyo.** El usuario sale del token firmado por Clerk,
+  nunca de lo que manda el navegador, y cada lectura, escritura o borrado
+  comprueba que el proyecto sea suyo. Un id ajeno responde 404, igual que uno
+  que no existe. Los productos se buscan sólo dentro de un proyecto propio: el
+  id de un producto ajeno no sirve para modificarlo.
+- Los **borradores** del navegador son por usuario: en una compu compartida,
+  quien ingresa no ve lo que editó el anterior, y al cambiar de cuenta la
+  pantalla vuelve a la plantilla.
+- **Desde Notion** se puede editar un producto o apagar *Visible*: el editor
+  lo toma al abrir el proyecto, y guardar no toca los ocultos.
+- Borrar un proyecto lo archiva junto con sus productos: quedan 30 días en la
+  papelera de Notion.
+- Si había proyectos guardados en el navegador de antes de las cuentas, al
+  ingresar aparece *Pasarlos a mi cuenta*.
 
 | Variable | Qué es |
 |---|---|
-| `NOTION_TOKEN` | El secreto de la integración de Notion. **Falta cargarlo** |
-| `ORIGENES_PERMITIDOS` | Opcional. Orígenes que pueden llamar a `/api/publicar`, separados por coma |
+| `CLERK_SECRET_KEY`, `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` | Las carga sola la integración de Clerk |
+| `NOTION_TOKEN` | El secreto de la integración de Notion (`tienditapy`) |
+| `NOTION_DB_PROYECTOS`, `NOTION_DB_PRODUCTOS` | Los ids de las dos bases |
 
-### Notion: lo que falta configurar
-
-1. Creá una integración interna en <https://www.notion.so/my-integrations>. El
-   secreto que te da es `NOTION_TOKEN`.
-2. Abrí la base de productos → menú `•••` → *Conexiones* → agregá la integración.
-   **Sin este paso Notion responde 404**, aunque el id sea correcto.
-3. Copiá el id de la base: son los 32 caracteres de la URL,
-   `notion.so/<workspace>/<ID DE 32>?v=…`.
-
-La base puede tener las columnas que quieras. Se buscan por nombre, sin
-distinguir mayúsculas ni acentos:
-
-| Campo de la plantilla | Columnas que reconoce | Tipo |
-|---|---|---|
-| Título | la columna de tipo *title*, se llame como se llame | title |
-| Precio | Precio · Monto · Valor · Meta · Dato | número o texto |
-| Descripción | Descripción · Detalle · Texto | texto |
-| Imagen | Imagen · Foto · Portada | archivo o URL |
-| Visible | Visible · Publicado · Activo | casilla (si es falsa, se omite) |
-| Orden | Orden · Posición · Nº | número |
-
-Si el precio es un **número**, se formatea como `Gs. 285.000`. Si lo escribís como
-texto, se respeta tal cual.
-
-### Leer en vivo o dejarlo escrito
-
-La casilla *«Leer Notion cada vez que alguien abre la página»* decide qué pasa al
-exportar:
-
-- **Apagada**: los productos quedan escritos en el HTML. Un archivo suelto, sin
-  dependencias.
-- **Encendida**: la página consulta `/api/catalogo` al abrirse, así el dueño cambia
-  un precio en Notion y se ve solo. Los productos escritos quedan igual como
-  **respaldo**: si Notion tarda o falla, la página muestra la última versión
-  exportada en vez de un hueco.
+En Clerk (*Configure → User & authentication*, instancia **Development**) están
+activados el usuario para registrarse e ingresar y la contraseña de 8 caracteres
+como mínimo. La instancia de **Production** tiene su propia configuración.
 
 ## Publicar demos para clientes
 
@@ -178,8 +196,25 @@ devuelve un enlace para mandarle al cliente (con atajo a WhatsApp).
 - Las demos se publican **sin la pantalla de login de Vercel**, para que el
   cliente las abra directo.
 
+### Cada dirección tiene dueño
+
+Publicar pide **haber ingresado** y la **clave de publicación**. La clave sigue
+porque el registro de cuentas es abierto: dice quién puede desplegar en tu
+cuenta de Vercel. La sesión dice de quién es cada demo.
+
+- La demo se publica desde un **proyecto guardado**. El editor lo guarda solo
+  si hace falta. La dirección queda a nombre de ese proyecto, en la columna
+  **Demo** de la base Proyectos.
+- Sólo ese proyecto puede volver a publicar en esa dirección. Otro usuario, o
+  hasta otro proyecto tuyo, recibe *«Esa dirección ya la usa otro proyecto»*.
+- Si un proyecto cambia de dirección o se borra, la demo vieja queda en línea
+  pero **nadie puede tomarla**. Existe en Vercel sin dueño, y eso se rechaza
+  siempre. Para reasignarla a mano, escribí el nombre (`demo-…`) en la columna
+  *Demo* del proyecto que corresponda.
+- Si dos personas piden la misma dirección a la vez, se la queda una sola.
+
 ```
-navegador ──POST /api/publicar (HTML + clave)──► Vercel (tiendita) ──VERCEL_TOKEN──► API de Vercel
+navegador ──POST /api/publicar (HTML + clave + sesión)──► Vercel (tiendita) ──VERCEL_TOKEN──► API de Vercel
                                                                  crea demo-x y despliega index.html
 ```
 
@@ -200,12 +235,6 @@ vercel --prod
 
 Para borrar una demo vieja: panel de Vercel → proyecto `demo-…` → *Settings* →
 *Delete project*, o `vercel project rm demo-…`.
-
-## Dónde se guardan los proyectos
-
-En `localStorage` del navegador: los proyectos guardados y un borrador por rubro,
-para no perder lo que estabas editando al cambiar de plantilla. No hay servidor ni
-base de datos. La copia que no depende del navegador es el HTML exportado.
 
 ## Deploy
 

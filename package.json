@@ -4,5 +4,10 @@
   "private": true,
   "type": "module",
   "description": "Taller de Páginas — editor de plantillas web por rubro",
-  "engines": { "node": ">=20" }
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "@clerk/backend": "^3.20.1"
+  }
 }
