@@ -12,7 +12,7 @@ const raiz = resolve(import.meta.dirname, '..');
 const destino = process.argv[2] ?? resolve(raiz, 'dist/taller-de-paginas.html');
 const leer = p => readFileSync(resolve(raiz, p), 'utf8');
 
-const index = leer('index.html');
+const index = leer('editor.html');
 
 const titulo = index.match(/<title>[\s\S]*?<\/title>/)[0];
 const fuentes = [...index.matchAll(/<link rel="(?:preconnect|stylesheet)"[^>]*fonts\.g[^>]*>/g)].map(m => m[0]);

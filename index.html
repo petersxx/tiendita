@@ -3,138 +3,210 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Taller de Páginas</title>
-<meta name="description" content="Editor de plantillas por rubro para armar y exportar páginas web completas. Contenido de arranque pensado para negocios paraguayos.">
-<meta name="theme-color" content="#0E6F60" media="(prefers-color-scheme: light)">
-<meta name="theme-color" content="#0C1311" media="(prefers-color-scheme: dark)">
-<meta property="og:title" content="Taller de Páginas">
-<meta property="og:description" content="Elegí tu rubro, editá los textos y descargá tu página web lista para subir.">
+<title>Tiendita — Tu tienda online en minutos</title>
+<meta name="description" content="Creá tu tienda online gratis, cargá tus productos y recibí los pedidos armados en tu WhatsApp. Sin comisiones por venta. Hecho para emprendedores paraguayos.">
+<meta name="theme-color" content="#0E6F60">
+<meta property="og:title" content="Tiendita — Tu tienda online en minutos">
+<meta property="og:description" content="Cargá tus productos, compartí tu enlace y recibí los pedidos en WhatsApp. Sin comisiones, sin tarjeta.">
 <meta property="og:type" content="website">
-<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2032%2032%22%3E%3Crect%20width%3D%2232%22%20height%3D%2232%22%20rx%3D%227%22%20fill%3D%22%230E6F60%22%2F%3E%3Cg%20fill%3D%22%23fff%22%3E%3Crect%20x%3D%227%22%20y%3D%228%22%20width%3D%2218%22%20height%3D%223.4%22%20rx%3D%221.7%22%2F%3E%3Crect%20x%3D%227%22%20y%3D%2214.3%22%20width%3D%2218%22%20height%3D%223.4%22%20rx%3D%221.7%22%2F%3E%3Crect%20x%3D%227%22%20y%3D%2220.6%22%20width%3D%2218%22%20height%3D%223.4%22%20rx%3D%221.7%22%2F%3E%3C%2Fg%3E%3C%2Fsvg%3E">
+<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2032%2032%22%3E%3Crect%20width%3D%2232%22%20height%3D%2232%22%20rx%3D%227%22%20fill%3D%22%230E6F60%22%2F%3E%3Cpath%20d%3D%22M8%2012h16l-1.5%2012h-13z%22%20fill%3D%22%23fff%22%2F%3E%3Cpath%20d%3D%22M12%2012a4%204%200%200%201%208%200%22%20fill%3D%22none%22%20stroke%3D%22%23fff%22%20stroke-width%3D%222.4%22%2F%3E%3C%2Fsvg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Manrope:wght@400;500;600;700&family=Syne:wght@700;800&display=swap">
-<style>
-  /* Base que el visor de Artifacts aportaba; acá la declaramos nosotros. */
-  :root{
-    color-scheme: light dark;
-    padding-top: env(safe-area-inset-top, 0px);
-    padding-bottom: env(safe-area-inset-bottom, 0px);
-  }
-  img{ max-width: 100%; }
-  [hidden]{ display: none !important; }
-</style>
-<script>
-  /* Antes de pintar: respeta el tema elegido la vez anterior. */
-  try{ var _t = localStorage.getItem('taller.tema');
-       if(_t) document.documentElement.dataset.theme = JSON.parse(_t); }catch(e){}
-</script>
-<link rel="stylesheet" href="css/taller.css">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Syne:wght@700;800&display=swap">
+<link rel="stylesheet" href="css/sitio.css">
 </head>
-<body>
+<body class="portada">
 
-<header class="topbar">
-  <div class="logo"><span class="glyph"></span><span>Taller de Páginas</span></div>
-  <input id="proj-name" class="proj-name" type="text" value="Mi página sin título" aria-label="Nombre del proyecto">
-  <div class="top-actions">
-    <div class="cuenta" id="cuenta"></div>
-    <button class="btn ghost" id="btn-tema" type="button" title="Claro u oscuro" aria-label="Cambiar entre tema claro y oscuro">◐</button>
-    <button class="btn" id="btn-estilo" type="button">Estilo</button>
-    <button class="btn" id="btn-save" type="button">Guardar</button>
-    <button class="btn" id="btn-code" type="button"><span class="label">Ver </span>HTML</button>
-    <button class="btn" id="btn-export" type="button">Exportar</button>
-    <button class="btn primary" id="btn-publicar" type="button">Publicar demo</button>
+<header class="nav-sitio">
+  <div class="caja">
+    <a class="logo-sitio" href="/"><span class="glyph" aria-hidden="true"></span>Tiendita</a>
+    <nav class="nav-enlaces" aria-label="Secciones">
+      <a href="#funciones">Funciones</a>
+      <a href="#plantillas">Plantillas</a>
+      <a href="#precios">Precios</a>
+      <a href="#preguntas">Preguntas</a>
+    </nav>
+    <div class="nav-acciones">
+      <a class="btn-s fantasma" href="/panel">Ingresar</a>
+      <a class="btn-s primario" href="/panel?nueva=1"><span class="solo-ancho">Crear mi tienda gratis</span><span class="solo-angosto">Empezar</span></a>
+    </div>
   </div>
 </header>
 
-<div class="workbench">
-  <aside class="pane rail">
-    <div class="rail-h">Rubros <span id="rubro-count" style="font-family:var(--mono);font-size:10px"></span></div>
-    <div class="tpl-list" id="tpl-list"></div>
-    <div class="rail-h">Mis proyectos <button class="btn ghost tiny" id="btn-new" type="button">+ Nuevo</button></div>
-    <div id="proj-list"></div>
-    <div class="rail-h" style="margin-top:22px">Cómo se edita</div>
-    <p class="empty">Todo se edita <b>sobre la página</b>:</p>
-    <ul class="ayuda">
-      <li>Tocá un texto y escribí encima.</li>
-      <li>Tocá una imagen para cambiarla, o arrastrá una foto encima.</li>
-      <li>Pasá el mouse por una sección para moverla, cambiarle el estilo o quitarla.</li>
-      <li>Arrastrá <b>⠿</b> para mover secciones, productos o renglones.</li>
-      <li><b>＋</b> agrega una sección nueva.</li>
-      <li><b>Ctrl/Cmd + Z</b> deshace.</li>
-    </ul>
-    <div class="rail-h" style="margin-top:22px">Dónde se guarda</div>
-    <p class="empty" id="store-note">Comprobando…</p>
-  </aside>
+<main>
+  <!-- PORTADA -->
+  <section class="hero">
+    <div class="caja hero-grid">
+      <div class="hero-texto">
+        <span class="pildora"><span class="punto"></span>Hecho para emprendedores paraguayos</span>
+        <h1>Tu tienda online,<br><em>lista hoy.</em></h1>
+        <p class="bajada">Cargá tus productos, compartí tu enlace y recibí los pedidos armados en tu WhatsApp, con el detalle y el total. Sin comisiones por venta y sin tarjeta de crédito para empezar.</p>
+        <div class="hero-cta">
+          <a class="btn-s primario grande" href="/panel?nueva=1">Crear mi tienda gratis</a>
+          <button class="btn-s borde grande" type="button" data-demo="tienda">Ver una tienda de ejemplo</button>
+        </div>
+        <ul class="sellos">
+          <li><b>0%</b> de comisión por venta</li>
+          <li><b>Gs. 0</b> para empezar</li>
+          <li><b>5 min</b> para tenerla en línea</li>
+        </ul>
+      </div>
 
-  <section class="pane stage">
-    <div class="stage-bar">
-      <div class="seg" role="group" aria-label="Modo de trabajo">
-        <button type="button" data-modo="editar" aria-pressed="true">Editar</button>
-        <button type="button" data-modo="ver" aria-pressed="false">Previsualizar</button>
-      </div>
-      <div class="seg" role="group" aria-label="Ancho de pantalla">
-        <button type="button" data-device="escritorio" aria-pressed="true">Escritorio</button>
-        <button type="button" data-device="tablet" aria-pressed="false">Tablet</button>
-        <button type="button" data-device="movil" aria-pressed="false">Móvil</button>
-      </div>
-      <div class="zoom" role="group" aria-label="Zoom">
-        <button type="button" id="zoom-menos" aria-label="Achicar" title="Achicar">−</button>
-        <span id="zoom-val">100%</span>
-        <button type="button" id="zoom-mas" aria-label="Agrandar" title="Agrandar">+</button>
-        <button type="button" id="zoom-ajustar" class="ajustar" title="Ajustar a la ventana">Ajustar</button>
-      </div>
-      <button class="btn tiny" id="btn-deshacer" type="button" title="Deshacer (Ctrl/Cmd + Z)" disabled>↶ Deshacer</button>
-      <span class="dims" id="dims">1280 px de ancho</span>
-    </div>
-    <div class="canvas" id="canvas">
-      <div class="marco-wrap" id="marco-wrap">
-        <div class="frame" id="marco"><iframe id="preview" title="Vista previa de la página"></iframe></div>
+      <div class="hero-visual" aria-hidden="true">
+        <div class="navegador">
+          <div class="navegador-barra"><i></i><i></i><i></i><span>tiendita…/<b>nanduti-casa</b></span></div>
+          <div class="navegador-vista"><iframe class="mini" data-rubro="tienda" tabindex="-1" title="" sandbox loading="eager"></iframe></div>
+        </div>
+        <div class="burbuja-wa">
+          <div class="wa-cabeza"><span class="wa-avatar">W</span><div><b>Nuevo pedido</b><small>por tu tienda · ahora</small></div></div>
+          <p>Hola, quiero hacer este pedido (N° K7M2Q):<br>
+          • 2 × Guampa de palo santo — Gs. 190.000<br>
+          • 1 × Termo forrado en cuero — Gs. 185.000<br>
+          <b>Total: Gs. 375.000</b></p>
+        </div>
       </div>
     </div>
   </section>
+
+  <!-- CÓMO FUNCIONA -->
+  <section class="banda" id="como">
+    <div class="caja">
+      <div class="titulo-sec centrado">
+        <span class="ojo">Cómo funciona</span>
+        <h2>De cero a vender en tres pasos</h2>
+      </div>
+      <ol class="pasos-sitio">
+        <li><span class="num">1</span><h3>Creá tu cuenta</h3><p>Elegí el nombre de tu tienda, tu dirección web y tu rubro. Arrancás con una plantilla lista y productos de ejemplo.</p></li>
+        <li><span class="num">2</span><h3>Cargá tus productos</h3><p>Foto, precio, descripción y categoría. Marcá lo que está en oferta o agotado, y cambiá textos y colores sobre la misma página.</p></li>
+        <li><span class="num">3</span><h3>Compartí y vendé</h3><p>Pasá tu enlace por Instagram, Facebook o estados de WhatsApp. Los pedidos te llegan al chat y quedan guardados en tu panel.</p></li>
+      </ol>
+    </div>
+  </section>
+
+  <!-- FUNCIONES -->
+  <section class="seccion" id="funciones">
+    <div class="caja">
+      <div class="titulo-sec">
+        <span class="ojo">Funciones</span>
+        <h2>Todo lo que necesitás para vender, nada que te complique</h2>
+      </div>
+      <div class="rejilla-funciones">
+        <article class="funcion"><span class="ico" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 20l1.3-3.9A8 8 0 1 1 8 19z"/><path d="M9 10h6M9 13h4"/></svg></span>
+          <h3>Pedidos por WhatsApp</h3><p>El carrito arma el mensaje con cada producto, el envío y el total. Vos sólo confirmás y cobrás.</p></article>
+        <article class="funcion"><span class="ico" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="M8 14l2.5 2.5L16 10"/></svg></span>
+          <h3>Panel de pedidos</h3><p>Cada pedido queda con número, cliente y estado: nuevo, confirmado, enviado, entregado.</p></article>
+        <article class="funcion"><span class="ico" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h10M4 17h6"/><circle cx="18" cy="16" r="3"/></svg></span>
+          <h3>Productos y categorías</h3><p>Filtros por categoría, y etiquetas como <i>Nuevo</i>, <i>Oferta</i> o <i>Agotado</i> que se ven en la tienda.</p></article>
+        <article class="funcion"><span class="ico" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3 7h11v9H3zM14 10h4l3 3v3h-7"/><circle cx="7" cy="17.5" r="1.8"/><circle cx="17" cy="17.5" r="1.8"/></svg></span>
+          <h3>Envío o retiro</h3><p>Definí el costo de envío y desde qué monto es gratis. Tu cliente elige envío o retiro en el local.</p></article>
+        <article class="funcion"><span class="ico" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="12" rx="2"/><path d="M3 10h18M7 15h3"/></svg></span>
+          <h3>Pagos a tu manera</h3><p>Efectivo, transferencia, Tigo Money, Billetera Personal: tu cliente elige cómo pagar y lo coordinan por el chat.</p></article>
+        <article class="funcion"><span class="ico" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 3a9 9 0 1 0 0 18c1 0 1.5-.8 1.5-1.6 0-1.3-1-1.4-1-2.6 0-1 .8-1.8 1.8-1.8H17a4 4 0 0 0 4-4C21 6.6 17 3 12 3z"/><circle cx="7.5" cy="11" r="1.2"/><circle cx="11" cy="7.5" r="1.2"/><circle cx="15.5" cy="8.5" r="1.2"/></svg></span>
+          <h3>Tu marca, tu estilo</h3><p>Editás todo sobre la página: textos, fotos, colores y tipografía. Sin saber de diseño ni de programación.</p></article>
+      </div>
+    </div>
+  </section>
+
+  <!-- WHATSAPP -->
+  <section class="seccion alterna">
+    <div class="caja dividido">
+      <div>
+        <span class="ojo">Ventas por WhatsApp</span>
+        <h2>El pedido te llega completo. Sin idas y vueltas.</h2>
+        <p class="bajada">Tu cliente elige, agrega al carrito, pone su nombre y cómo quiere recibirlo. A tu WhatsApp llega un mensaje con todo calculado, y el pedido queda registrado en tu panel para que no se te pierda ninguno.</p>
+        <ul class="tildes">
+          <li>Subtotal, envío y total ya calculados</li>
+          <li>Envío gratis automático desde el monto que elijas</li>
+          <li>Número de pedido para seguirlo con tu cliente</li>
+        </ul>
+        <a class="btn-s primario" href="/panel?nueva=1">Empezar a recibir pedidos</a>
+      </div>
+      <div class="chat" aria-hidden="true">
+        <div class="chat-cabeza"><span class="wa-avatar">C</span><div><b>Ñandutí Casa</b><small>en línea</small></div></div>
+        <div class="msj entra">Hola Ñandutí Casa, quiero hacer este pedido (N° B4TQ9):<br><br>• 1 × Kit tereré completo — Gs. 320.000<br>• 1 × Cántaro de Itá — Gs. 130.000<br><br>Subtotal: Gs. 450.000<br>Envío: gratis<br><b>Total: Gs. 450.000</b><br><br>Nombre: Lorena<br>Dirección: Fernando de la Mora, zona norte<br>Pago: Transferencia</div>
+        <div class="msj sale">¡Hola Lorena! Confirmado 🙌 Te pasamos los datos para la transferencia.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- PLANTILLAS -->
+  <section class="seccion" id="plantillas">
+    <div class="caja">
+      <div class="titulo-sec">
+        <span class="ojo">Plantillas</span>
+        <h2>Una plantilla pensada para tu rubro</h2>
+        <p>Ropa, comida, belleza, tecnología, despensa y más. Todas se adaptan al celular y las cambiás a tu gusto.</p>
+      </div>
+      <div class="rejilla-plantillas" id="rejilla-plantillas"></div>
+    </div>
+  </section>
+
+  <!-- PRECIOS -->
+  <section class="seccion alterna" id="precios">
+    <div class="caja">
+      <div class="titulo-sec centrado">
+        <span class="ojo">Precios</span>
+        <h2>Empezá gratis. Crecé cuando quieras.</h2>
+        <p>Sin comisiones por venta en ningún plan. Pagás con Pagopar sólo los meses que elegís: no hay débito automático.</p>
+      </div>
+      <div class="rejilla-planes" id="rejilla-planes"><p class="cargando">Cargando planes…</p></div>
+    </div>
+  </section>
+
+  <!-- PREGUNTAS -->
+  <section class="seccion" id="preguntas">
+    <div class="caja angosta">
+      <div class="titulo-sec centrado">
+        <span class="ojo">Preguntas frecuentes</span>
+        <h2>Lo que más nos preguntan</h2>
+      </div>
+      <div class="preguntas">
+        <details><summary>¿Cobran comisión por cada venta?</summary><p>No. Lo que vendés es tuyo. Sólo pagás el plan si necesitás más de lo que incluye el Gratis.</p></details>
+        <details><summary>¿Necesito tarjeta de crédito para empezar?</summary><p>No. Creás tu cuenta y tu tienda sin cargar ningún medio de pago.</p></details>
+        <details><summary>¿Cómo me pagan mis clientes?</summary><p>Como ya cobrás hoy: efectivo, transferencia, Tigo Money, Billetera Personal u otro medio. Elegís cuáles aparecen en el carrito y lo coordinan por WhatsApp.</p></details>
+        <details><summary>¿Cuál va a ser la dirección de mi tienda?</summary><p>La elegís al crearla, por ejemplo <b>tiendita…/casa-nanduti</b>. La podés cambiar después desde tu panel.</p></details>
+        <details><summary>¿Cómo pago un plan?</summary><p>Con Pagopar: tarjeta de crédito o débito, billeteras y bocas de cobranza. Elegís 1, 3 o 12 meses y el plan se activa apenas se acredita el pago.</p></details>
+        <details><summary>¿Qué pasa si se vence mi plan?</summary><p>Tu tienda sigue en línea con los límites del plan Gratis. No se borra nada: los productos que pasan el límite dejan de mostrarse hasta que renueves.</p></details>
+        <details><summary>¿Puedo tener más de una tienda?</summary><p>Sí, con el plan Pro podés manejar hasta tres tiendas desde la misma cuenta.</p></details>
+      </div>
+    </div>
+  </section>
+
+  <!-- CIERRE -->
+  <section class="cierre">
+    <div class="caja">
+      <h2>Tu próxima venta puede entrar hoy.</h2>
+      <p>Creá tu tienda en minutos y compartí el enlace.</p>
+      <a class="btn-s claro grande" href="/panel?nueva=1">Crear mi tienda gratis</a>
+    </div>
+  </section>
+</main>
+
+<footer class="pie-sitio">
+  <div class="caja">
+    <a class="logo-sitio" href="/"><span class="glyph" aria-hidden="true"></span>Tiendita</a>
+    <nav aria-label="Pie"><a href="#funciones">Funciones</a><a href="#precios">Precios</a><a href="#preguntas">Preguntas</a><a href="/panel">Ingresar</a></nav>
+    <small>Hecho en Paraguay 🇵🇾</small>
+  </div>
+</footer>
+
+<div class="modal" id="modal-demo" hidden>
+  <div class="modal-velo" data-cerrar></div>
+  <div class="modal-caja ancha" role="dialog" aria-modal="true" aria-labelledby="demo-titulo">
+    <div class="modal-cabeza">
+      <b id="demo-titulo">Plantilla</b>
+      <div class="modal-acciones">
+        <a class="btn-s primario chico" id="demo-usar" href="/panel?nueva=1">Usar esta plantilla</a>
+        <button class="btn-s fantasma chico" type="button" data-cerrar aria-label="Cerrar">✕</button>
+      </div>
+    </div>
+    <iframe id="demo-marco" title="Vista de la plantilla" sandbox="allow-scripts"></iframe>
+  </div>
 </div>
-
-<nav class="tabbar" role="group" aria-label="Secciones">
-  <button type="button" data-tab="plantillas" aria-pressed="false">Plantillas</button>
-  <button type="button" data-tab="vista" aria-pressed="true">Vista</button>
-</nav>
-
-<input type="file" id="archivo-img" accept="image/png,image/jpeg,image/webp,image/avif,image/gif,image/svg+xml" hidden>
-
-<div class="barra-lienzo" id="barra-lienzo" hidden role="toolbar" aria-label="Acciones del elemento elegido">
-  <button type="button" data-bact="mover" class="asa" title="Arrastrá para mover" aria-label="Mover">⠿</button>
-  <button type="button" data-bact="link" title="Destino del enlace" aria-label="Destino del enlace">🔗</button>
-  <button type="button" data-bact="up"   title="Subir" aria-label="Subir">↑</button>
-  <button type="button" data-bact="down" title="Bajar" aria-label="Bajar">↓</button>
-  <button type="button" data-bact="dup"  title="Duplicar" aria-label="Duplicar">⧉</button>
-  <button type="button" data-bact="img"  title="Cambiar la imagen" aria-label="Cambiar la imagen">Cambiar foto</button>
-  <button type="button" data-bact="imgq" title="Quitar imagen" aria-label="Quitar imagen">⊘</button>
-  <button type="button" data-bact="rm" class="rm" title="Quitar" aria-label="Quitar">✕</button>
-</div>
-
-<div class="barra-seccion" id="barra-seccion" hidden role="toolbar" aria-label="Acciones de la sección">
-  <button type="button" data-sact="mover" class="asa" title="Arrastrá para mover la sección" aria-label="Mover sección">⠿</button>
-  <b id="sec-nombre"></b>
-  <select id="sec-variante" aria-label="Estilo de la sección" hidden></select>
-  <button type="button" data-sact="item" title="Agregar un ítem a esta sección">＋ Ítem</button>
-  <button type="button" data-sact="datos" title="Todos los datos de esta sección">Datos</button>
-  <button type="button" data-sact="rm" class="rm" title="Quitar la sección" aria-label="Quitar la sección">✕</button>
-</div>
-<button type="button" class="mas-seccion" id="mas-seccion" hidden title="Agregar una sección acá">＋ Sección</button>
-<div class="guia-arrastre" id="guia-arrastre" hidden></div>
-
-<div class="pop" id="pop" hidden role="dialog" aria-labelledby="pop-t">
-  <div class="pop-h"><b id="pop-t"></b><button class="btn ghost tiny" type="button" id="pop-cerrar" aria-label="Cerrar">✕</button></div>
-  <div class="pop-b" id="panel"></div>
-</div>
-
-<div class="toast" id="toast" role="status" aria-live="polite"></div>
 
 <script src="js/motor.js"></script>
 <script src="js/secciones.js"></script>
 <script src="js/rubros.js"></script>
-<script src="js/cuenta.js"></script>
-<script src="js/app.js"></script>
+<script src="js/sitio.js"></script>
 </body>
 </html>

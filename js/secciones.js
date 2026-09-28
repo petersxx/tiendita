@@ -482,7 +482,9 @@ function capaEditorCss(){ return `
 /* ---------- carrito de la tienda ----------
    Arma el pedido en el navegador del visitante y lo manda por WhatsApp.
    No hay pasarela de pago: el negocio confirma el pedido y cobra como
-   ya cobra. El carrito queda en localStorage para no perderlo al recargar. */
+   ya cobra. El carrito queda en localStorage para no perderlo al recargar.
+   En una tienda de la plataforma (d._pedidos) el pedido además se registra
+   en el panel del negocio; el servidor recalcula precios y totales. */
 const numeroPrecio = s => { const n = String(s||'').replace(/\D/g,''); return n ? Number(n) : 0; };
 
 function guionTienda(d){
@@ -494,7 +496,9 @@ function guionTienda(d){
     envio: String(d.tiendaEnvio||'').trim() ? numeroPrecio(d.tiendaEnvio) : null,
     gratis: numeroPrecio(d.tiendaGratis),
     pagos: String(d.tiendaPagos||'').split(',').map(s=>s.trim()).filter(Boolean),
-    productos: (d.productos||[]).map(p => ({ t: p.titulo||'', p: numeroPrecio(p.precio) })),
+    productos: (d.productos||[]).map(p => ({ t: p.titulo||'', p: numeroPrecio(p.precio), id: p._nid||'' })),
+    api: d._pedidos || '',
+    tienda: d._slug || '',
   };
   const json = JSON.stringify(datos).replace(/</g,'\\u003c');
   return `
@@ -508,11 +512,13 @@ function guionTienda(d){
   <div class="carro-lineas"></div>
   <form class="carro-form">
     <div class="carro-tot"></div>
-    <label>Nombre<input name="nombre" required autocomplete="name"></label>
+    <label>Nombre<input name="nombre" required autocomplete="name" maxlength="120"></label>
+    <label>Teléfono<input name="telefono" type="tel" autocomplete="tel" maxlength="30" placeholder="0981 123 456"></label>
     <label class="carro-entrega">Entrega<select name="entrega"><option>Envío a domicilio</option><option>Retiro en el local</option></select></label>
     <label class="carro-dir">Dirección<input name="direccion" autocomplete="street-address"></label>
     <label class="carro-pago">Pago<select name="pago"></select></label>
-    <label>Notas<textarea name="notas" rows="2" placeholder="Talle, color, horario de entrega…"></textarea></label>
+    <label>Notas<textarea name="notas" rows="2" maxlength="500" placeholder="Talle, color, horario de entrega…"></textarea></label>
+    <input name="web" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;width:1px;height:1px">
     <button type="submit" class="btn">Enviar pedido por WhatsApp</button>
     <button type="button" class="carro-vaciar">Vaciar carrito</button>
   </form>
@@ -521,7 +527,8 @@ function guionTienda(d){
 <script>
 (function(){
   var D = ${json};
-  var CLAVE = 'carrito:' + D.marca, items = {};
+  // en la plataforma todas las tiendas comparten dominio: la dirección las distingue
+  var CLAVE = 'carrito:' + (D.tienda || D.marca), items = {};
   var $ = function(s){ return document.querySelector(s); };
   function e(s){ return String(s == null ? '' : s).replace(/[&<>"]/g, function(c){
     return { '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;' }[c]; }); }
@@ -611,8 +618,14 @@ function guionTienda(d){
   form.entrega.addEventListener('change', pintar);
   $('.carro-vaciar').addEventListener('click', function(){ items = {}; guardar(); pintar(); abrir(false); });
 
+  function mandar(msg, ventana){
+    var url = 'https://wa.me/' + D.wa + '?text=' + encodeURIComponent(msg);
+    if(ventana){ ventana.location.href = url; } else { window.location.href = url; }
+  }
+  var enviando = false;
   form.addEventListener('submit', function(ev){
     ev.preventDefault();
+    if(enviando) return;
     var k = cuentas(), v = form.elements;
     var renglones = Object.keys(items).map(function(i){
       var p = D.productos[i];
@@ -630,7 +643,40 @@ function guionTienda(d){
       v.notas.value.trim() ? 'Notas: ' + v.notas.value.trim() : null,
     ]).filter(function(x){ return x !== null; }).join('\\n');
     if(!D.wa){ aviso('Falta cargar el WhatsApp del negocio'); return; }
-    window.open('https://wa.me/' + D.wa + '?text=' + encodeURIComponent(msg), '_blank');
+    if(!D.api){ window.open('https://wa.me/' + D.wa + '?text=' + encodeURIComponent(msg), '_blank'); return; }
+
+    // la pestaña se abre ya, con el clic; si se abriera después de esperar al servidor, el navegador la bloquea
+    var ventana = window.open('', '_blank');
+    var enviar = form.querySelector('[type=submit]');
+    enviando = true; enviar.disabled = true; enviar.textContent = 'Enviando…';
+    var ctrl = window.AbortController ? new AbortController() : null;
+    var corte = setTimeout(function(){ if(ctrl) ctrl.abort(); }, 8000);
+    fetch(D.api, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, signal: ctrl ? ctrl.signal : undefined,
+      body: JSON.stringify({
+        tienda: D.tienda,
+        items: Object.keys(items).map(function(i){ return { id: D.productos[i].id, c: items[i].c }; }),
+        nombre: v.nombre.value.trim(), telefono: v.telefono.value.trim(),
+        entrega: k.retiro ? 'Retiro en el local' : 'Envío a domicilio',
+        direccion: k.retiro ? '' : v.direccion.value.trim(),
+        pago: D.pagos.length ? v.pago.value : '', notas: v.notas.value.trim(),
+        web: v.web ? v.web.value : '',
+      }),
+    }).then(function(r){ return r.json().catch(function(){ return {}; }).then(function(j){ return { ok: r.ok, j: j }; }); })
+      .then(function(x){
+        if(x.ok && x.j.mensaje){
+          mandar(x.j.mensaje, ventana);
+          items = {}; guardar(); pintar(); abrir(false); form.reset();
+          aviso('Pedido ' + x.j.numero + ' registrado');
+        }else if(x.j && x.j.error && x.j.recargar){
+          if(ventana) ventana.close();
+          aviso(x.j.error);
+        }else{
+          mandar(msg, ventana);              // sin registro, el pedido igual llega por WhatsApp
+        }
+      })
+      .catch(function(){ mandar(msg, ventana); })
+      .then(function(){ clearTimeout(corte); enviando = false; enviar.disabled = false; enviar.textContent = 'Enviar pedido por WhatsApp'; });
   });
 
   pintar();

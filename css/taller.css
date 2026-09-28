@@ -359,3 +359,11 @@ button{font:inherit;color:inherit}
 .cuenta{display:flex;align-items:center;min-width:32px;justify-content:center}
 .cuenta-off{font-size:12px;color:var(--muted);font-family:var(--mono)}
 .enlace{background:none;border:0;padding:0;font:inherit;color:var(--accent);text-decoration:underline;cursor:pointer}
+
+/* ---------- modo tienda (editor abierto desde el panel) ---------- */
+.solo-tienda{display:none}
+body[data-modo="tienda"] .solo-tienda{display:inline-flex;align-items:center;text-decoration:none}
+body[data-modo="tienda"] #btn-publicar,
+body[data-modo="tienda"] #btn-export,
+body[data-modo="tienda"] #btn-code{display:none}
+body[data-modo="tienda"] #btn-save{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}

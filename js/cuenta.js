@@ -76,9 +76,11 @@ const cuenta = {
     this.alCambiar();
   },
 
+  /* el editor tiene una caja (#cuenta); el panel, varias ([data-cuenta]) */
   pintar(){
-    const caja = $('#cuenta');
-    if(!caja) return;
+    document.querySelectorAll('#cuenta, [data-cuenta]').forEach(caja => this._pintarEn(caja));
+  },
+  _pintarEn(caja){
     if(this.estado === 'cargando'){ caja.innerHTML = ''; return; }
     if(this.estado === 'sin-servicio'){
       caja.innerHTML = `<span class="cuenta-off" title="${esc(EN_VISOR
@@ -87,11 +89,14 @@ const cuenta = {
       return;
     }
     if(this.usuario){
-      if(!caja.querySelector('.cuenta-usuario')){
+      // un botón montado para otra persona no sirve: se vuelve a montar
+      if(caja.dataset.uid !== this.usuario.id || !caja.querySelector('.cuenta-usuario')){
+        caja.dataset.uid = this.usuario.id;
         caja.innerHTML = '<div class="cuenta-usuario"></div>';
         this.clerk.mountUserButton(caja.querySelector('.cuenta-usuario'));
       }
     }else{
+      delete caja.dataset.uid;
       caja.innerHTML = '<button class="btn" type="button" data-ingresar>Ingresar</button>';
     }
   },

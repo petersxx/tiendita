@@ -1,7 +1,10 @@
 /* Acceso a Notion compartido por las funciones de la API.
-   Hay dos bases, siempre las mismas para todos los proyectos:
-     NOTION_DB_PROYECTOS  una fila por proyecto, con su dueño y su diseño
-     NOTION_DB_PRODUCTOS  una fila por producto, con relación a su proyecto */
+   Las bases son siempre las mismas para todas las tiendas:
+     NOTION_DB_PROYECTOS  una fila por tienda (proyecto), con su dueño, su dirección y su diseño
+     NOTION_DB_PRODUCTOS  una fila por producto, con relación a su tienda
+     NOTION_DB_PEDIDOS    una fila por pedido que entra por una tienda publicada
+     NOTION_DB_PAGOS      una fila por pago de un plan con Pagopar
+   tools/preparar-notion.mjs crea las dos últimas. */
 
 const VERSION_NOTION = '2022-06-28';
 const MAX_TEXTO = 2000;          // Notion corta cada trozo de texto en 2000 caracteres
@@ -9,6 +12,8 @@ const MAX_TROZOS = 100;          // y admite hasta 100 trozos por propiedad
 
 export const DB_PROYECTOS = () => limpiarId(process.env.NOTION_DB_PROYECTOS);
 export const DB_PRODUCTOS = () => limpiarId(process.env.NOTION_DB_PRODUCTOS);
+export const DB_PEDIDOS = () => limpiarId(process.env.NOTION_DB_PEDIDOS);
+export const DB_PAGOS = () => limpiarId(process.env.NOTION_DB_PAGOS);
 
 /** Un id de Notion sin guiones, o '' si no tiene el formato de 32 caracteres. */
 export function limpiarId(s) {
@@ -82,6 +87,10 @@ export function leer(p) {
     case 'number':    return p.number == null ? '' : String(p.number);
     case 'select':    return p.select?.name || '';
     case 'url':       return p.url || '';
+    case 'email':     return p.email || '';
+    case 'phone_number': return p.phone_number || '';
+    case 'date':      return p.date?.start || '';
+    case 'created_time': return p.created_time || '';
     case 'checkbox':  return p.checkbox;
     case 'last_edited_time': return p.last_edited_time || '';
     case 'files': {
@@ -111,6 +120,36 @@ export async function proyectoDe(id, usuario) {
   const deLaBase = limpiarId(fila.parent?.database_id) === DB_PROYECTOS();
   if (!deLaBase || fila.archived || leer(fila.properties['Usuario']) !== usuario) return null;
   return fila;
+}
+
+/* ---------- direcciones de tienda ---------- */
+
+/** Palabras que no pueden ser la dirección de una tienda: son páginas de la plataforma. */
+const RESERVADAS = new Set(['api', 'css', 'js', 'img', 'panel', 'editor', 'admin', 'precios', 'planes', 'ayuda',
+  'ingresar', 'registro', 'cuenta', 'tienda', 'tiendas', 'demo', 'soporte', 'terminos', 'privacidad', 'index', 'www']);
+
+/** La dirección normalizada (minúsculas, sin tildes, con guiones), o '' si no sirve. */
+export function normalizarSlug(s) {
+  const v = String(s || '')
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')
+    .slice(0, 40).replace(/-+$/, '');
+  return v.length >= 3 && !RESERVADAS.has(v) ? v : '';
+}
+
+/** Filas de Proyectos (sin archivar) que usan esa dirección, la más vieja primero. */
+export async function conSlug(slug) {
+  const filas = await consultar(DB_PROYECTOS(), { filter: { property: 'Slug', rich_text: { equals: slug } } });
+  return filas.sort((a, b) => a.created_time.localeCompare(b.created_time) || a.id.localeCompare(b.id));
+}
+
+/** La tienda publicada con esa dirección, o null. Si por una carrera
+ *  quedaron dos con la misma, vale la que la tomó primero. */
+export async function tiendaPorSlug(slug) {
+  const s = normalizarSlug(slug);
+  if (!s) return null;
+  const [fila] = await conSlug(s);
+  return fila && leer(fila.properties['Publicada']) === true ? fila : null;
 }
 
 /* ---------- productos ---------- */

@@ -12,6 +12,7 @@
    en Notion (Visible apagado) no llega al editor y guardar no lo toca. */
 import { cors, faltantes, error } from './_comun.js';
 import { usuarioDe, nombreDeUsuario } from './_sesion.js';
+import { planDe } from './_planes.js';
 import {
   notion, consultar, texto, leer, opcion, limpiarId,
   aPropiedades, productosDe, proyectoDe, DB_PROYECTOS, DB_PRODUCTOS,
@@ -19,6 +20,27 @@ import {
 
 const REQUERIDAS = ['CLERK_SECRET_KEY', 'NOTION_TOKEN', 'NOTION_DB_PROYECTOS', 'NOTION_DB_PRODUCTOS'];
 const MAX_PRODUCTOS = 300;
+const cat = s => String(s || '').replace(/,/g, ' ').trim().toLowerCase();
+
+/** En una tienda (una página con dirección), el motivo por el que esos
+ *  productos pasan el límite del plan, o null. Sólo se frena lo que suma:
+ *  si un plan venció, se puede seguir guardando lo que ya había. */
+async function excedePlan(fila, usuario, id, productos) {
+  if (!leer(fila.properties['Slug'])) return null;
+  const plan = await planDe(usuario);
+  const antes = await productosDe(id, { todos: true });
+  const ocultos = antes.filter(p => !p.visible);
+  const total = productos.length + ocultos.length;
+  if (total > plan.productos && total > antes.length) {
+    return `Tu plan ${plan.nombre} permite ${plan.productos} productos. Mejorá tu plan desde el panel para cargar más.`;
+  }
+  const categorias = lista => new Set(lista.map(p => cat(p.categoria)).filter(Boolean)).size;
+  const nuevas = categorias([...productos, ...ocultos]);
+  if (nuevas > plan.categorias && nuevas > categorias(antes)) {
+    return `Tu plan ${plan.nombre} permite ${plan.categorias} categorías. Mejorá tu plan desde el panel para usar más.`;
+  }
+  return null;
+}
 
 function resumen(fila) {
   const p = fila.properties;
@@ -26,6 +48,8 @@ function resumen(fila) {
     id: limpiarId(fila.id),
     nombre: leer(p['Nombre']),
     rubro: leer(p['Rubro']),
+    slug: leer(p['Slug']),
+    publicada: leer(p['Publicada']) === true,
     actualizado: fila.last_edited_time,
   };
 }
@@ -101,7 +125,10 @@ async function guardar(req, res, usuario) {
 
   let id = limpiarId(b.id), fila;
   if (id) {
-    if (!(await proyectoDe(id, usuario))) return error(res, 404, 'Ese proyecto no existe o no es tuyo.');
+    const previa = await proyectoDe(id, usuario);
+    if (!previa) return error(res, 404, 'Ese proyecto no existe o no es tuyo.');
+    const motivo = productos && await excedePlan(previa, usuario, id, productos);
+    if (motivo) return error(res, 403, motivo, { mejorar: true });
     fila = await notion(`/pages/${id}`, { method: 'PATCH', body: { properties: props } });
   } else {
     fila = await notion('/pages', {

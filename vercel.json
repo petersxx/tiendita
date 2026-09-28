@@ -1,5 +1,12 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "cleanUrls": true,
-  "trailingSlash": false
+  "trailingSlash": false,
+  "functions": {
+    "api/tienda.js": { "includeFiles": "js/{motor,secciones,rubros}.js" },
+    "api/tiendas.js": { "includeFiles": "js/{motor,secciones,rubros}.js" }
+  },
+  "rewrites": [
+    { "source": "/:slug([a-z0-9][a-z0-9-]{1,38}[a-z0-9])", "destination": "/api/tienda?slug=:slug" }
+  ]
 }

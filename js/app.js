@@ -11,6 +11,19 @@ const btnDeshacer = $('#btn-deshacer');
 let TPL = RUBROS[0];
 let D = clonar(TPL.d);
 let proyectoId = null;
+
+/* Con ?tienda=<id> el editor edita el diseño de una tienda de la
+   plataforma: se abre esa tienda, se guarda sobre ella y se esconden
+   las herramientas de agencia (rubros, exportar, publicar demos). */
+const TIENDA_ID = new URLSearchParams(location.search).get('tienda');
+let tiendaSlug = '';
+if(TIENDA_ID){
+  document.body.dataset.modo = 'tienda';
+  // los rubros y la lista de proyectos son del taller, no de una tienda
+  [$('#rubro-count').parentElement, listaTpl, $('#btn-new').parentElement, listaProj].forEach(el => el.hidden = true);
+  inpNombre.readOnly = true;
+  inpNombre.title = 'El nombre se cambia desde el panel, en Mi tienda';
+}
 let cap = { db:null, downloads:null };
 
 let modo = 'editar';              // 'editar' escribe sobre la página · 'ver' la usa como el visitante
@@ -954,6 +967,7 @@ const almacen = {
     this.dueno = uid;
     if(!cuenta.usuario){
       proyectoId = null;
+      if(TIENDA_ID && cuenta.estado === 'listo') cuenta.ingresar();
       notaAlmacen.textContent = cuenta.estado === 'listo'
         ? 'Sin ingresar, lo que editás queda sólo como borrador en este navegador.'
         : 'Sin conexión con las cuentas: lo que editás queda como borrador en este navegador.';
@@ -966,6 +980,14 @@ const almacen = {
       const { proyectos } = await api('/api/proyectos');
       if(!esDe(uid)) return;
       this.cargando = false; pintarProyectos(proyectos);
+      if(TIENDA_ID){
+        const t = proyectos.find(p => p.id === TIENDA_ID);
+        if(!t){ aviso('Esa tienda no es de tu cuenta.'); return; }
+        tiendaSlug = t.slug || '';
+        const ver = $('#btn-ver-tienda');
+        ver.href = '/' + tiendaSlug; ver.hidden = !tiendaSlug || !t.publicada;
+        if(proyectoId !== TIENDA_ID) await abrirProyecto(TIENDA_ID);
+      }
     }catch(err){
       this.cargando = false; pintarProyectos([]);
       aviso(explicarFalloDeRed(err));
@@ -1005,6 +1027,8 @@ async function guardar(silencioso){
     if(!silencioso){ aviso('Ingresá para guardar tus proyectos'); cuenta.ingresar(); }
     return;
   }
+  // en modo tienda sólo se guarda sobre esa tienda, nunca un proyecto nuevo
+  if(TIENDA_ID && proyectoId !== TIENDA_ID){ if(!silencioso) aviso('Esperá a que termine de abrir tu tienda.'); return; }
   // un guardado a la vez: si llega otro mientras tanto, se hace al terminar
   if(guardando){ guardarOtraVez = true; return guardando; }
 
@@ -1026,9 +1050,11 @@ async function guardar(silencioso){
     guardarBorrador();
     const resto = almacen.cache.filter(p=>p.id !== r.id);
     pintarProyectos([{ id:r.id, nombre:cuerpo.nombre, rubro:cuerpo.rubro, actualizado:r.actualizado }, ...resto]);
-    if(!silencioso) aviso('Guardado en Notion');
+    if(!silencioso) aviso(TIENDA_ID ? 'Guardado. Tu tienda se actualiza en un minuto.' : 'Guardado en Notion');
   }).catch(err=>{
-    aviso(err.status === 401 ? 'Tu sesión venció: ingresá de nuevo.' : 'No se pudo guardar: ' + explicarFalloDeRed(err));
+    aviso(err.status === 401 ? 'Tu sesión venció: ingresá de nuevo.'
+      : err.status === 403 ? explicarFalloDeRed(err)
+      : 'No se pudo guardar: ' + explicarFalloDeRed(err));
   }).finally(()=>{
     guardando = null;
     if(guardarOtraVez){ guardarOtraVez = false; if(esDe(uid)) guardar(true); }
@@ -1163,8 +1189,7 @@ function explicarFalloDeRed(err){
   return String(err.message || err);
 }
 
-const LADO_MAX = 1920;                    // px del lado más largo
-const IMG_MAX_BYTES = 3 * 1024 * 1024;    // ya achicada; en base64 entra en una función de Vercel
+const IMG_MAX_BYTES = 3 * 1024 * 1024;    // ya achicada; en base64 entra en una función de Vercel (sólo demos locales)
 const ES_LOCAL = /^img\/[0-9a-f]{12}\.(webp|jpg|png|gif|svg)$/;
 const EXT_IMG = { 'image/webp':'webp', 'image/jpeg':'jpg', 'image/png':'png', 'image/gif':'gif', 'image/svg+xml':'svg' };
 
@@ -1245,24 +1270,6 @@ async function htmlAutonomo(){
   return renderDoc(TPL, mapearTextos(D, v=> ES_LOCAL.test(v) ? (datos[v] || '') : v));
 }
 
-/* achica fotos grandes; SVG y GIF (vectores, animaciones) pasan tal cual */
-async function achicar(archivo){
-  if(/svg|gif/.test(archivo.type)) return archivo;
-  let bmp;
-  try{ bmp = await createImageBitmap(archivo); }
-  catch(e){ throw new Error('Este navegador no puede leer esa imagen. Probá con JPG o PNG.'); }
-  const k = Math.min(1, LADO_MAX / Math.max(bmp.width, bmp.height));
-  const c = document.createElement('canvas');
-  c.width = Math.round(bmp.width * k); c.height = Math.round(bmp.height * k);
-  c.getContext('2d').drawImage(bmp, 0, 0, c.width, c.height);
-  if(bmp.close) bmp.close();
-  const aBlob = (tipo, q)=> new Promise(ok=>c.toBlob(ok, tipo, q));
-  let b = await aBlob('image/webp', .82);
-  if(!b || b.type !== 'image/webp') b = await aBlob(archivo.type === 'image/png' ? 'image/png' : 'image/jpeg', .85);
-  // si ya venía chica y en un formato conocido, no la empeoramos
-  return (k === 1 && EXT_IMG[archivo.type] && archivo.size <= b.size) ? archivo : b;
-}
-
 const inputArchivo = $('#archivo-img');
 let rutaSubida = null;
 
@@ -1293,10 +1300,21 @@ async function subirImagen(archivo, ruta){
   aviso('Preparando ' + archivo.name + '…');
 
   try{
-    const blob = await achicar(archivo);
-    if(blob.size > IMG_MAX_BYTES) throw new Error('La imagen sigue pasando de 3 MB. Probá con otra.');
+    const blob = await achicarFoto(archivo);
+    // con sesión, la foto va a R2 y queda con una dirección pública que sirve en cualquier compu;
+    // si R2 no está configurado, las demos siguen con las imágenes locales de antes
+    let valor = null;
+    if(cuenta.usuario && !/svg/.test(blob.type)){
+      try{ aviso('Subiendo ' + archivo.name + '…'); valor = await subirFoto(blob); }
+      catch(err){ if(err.status !== 503 || TIENDA_ID) throw err; }
+    }
+    if(!valor){
+      if(TIENDA_ID) throw new Error(/svg/.test(blob.type) ? 'Usá una foto JPG, PNG o WebP.' : 'Ingresá para subir fotos.');
+      if(blob.size > IMG_MAX_BYTES) throw new Error('La imagen sigue pasando de 3 MB. Probá con otra.');
+      valor = await imagenes.guardar(blob);
+    }
     recordar();
-    fijar(D, ruta, await imagenes.guardar(blob));
+    fijar(D, ruta, valor);
     refrescarCampoImagen(ruta);
     pintarVista();
     apuntarGuardado();

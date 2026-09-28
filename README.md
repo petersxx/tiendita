@@ -1,8 +1,143 @@
+# Tiendita
+
+Plataforma para que emprendedores paraguayos armen su tienda online solos:
+se registran, eligen la dirección y el rubro, cargan productos y reciben los
+pedidos armados en su WhatsApp. Cada pedido además queda registrado en su
+panel. Los planes pagos se cobran con Pagopar.
+
+| Ruta | Qué es |
+|---|---|
+| `/` | Portada pública (`index.html`): funciones, plantillas reales, precios y preguntas |
+| `/panel` | Panel del cliente (`panel.html`): alta de la tienda, inicio con métricas, productos, pedidos, ajustes y plan |
+| `/editor?tienda=<id>` | El editor de diseño, abierto sobre la tienda del cliente |
+| `/editor` | El Taller de Páginas de siempre, para armar demos (ver más abajo) |
+| `/<dirección>` | Cada tienda publicada, armada en el momento por `api/tienda.js` |
+
+## Cómo funciona una tienda
+
+```
+visitante ──GET /casa-nanduti──► api/tienda.js ──► Notion (tienda + productos) + Clerk (plan del dueño)
+                                     │ mismo motor que el editor (js/motor.js, secciones.js, rubros.js)
+                                     ▼
+                                HTML con carrito · 1 minuto en la CDN de Vercel
+
+carrito ──POST /api/pedidos──► recalcula precios y total con Notion ──► fila en Pedidos
+        ◄── número y mensaje ──  y abre WhatsApp con el pedido armado
+```
+
+- **Una tienda es una fila de Proyectos con `Slug`** (su dirección) y
+  `Publicada`. El diseño lo sigue guardando el editor; el panel cambia nombre,
+  dirección, WhatsApp, envío y formas de pago sin abrirlo.
+- **Al crearla** arranca con la plantilla del rubro, siempre con carrito, sin
+  testimonios de ejemplo (en una tienda real parecerían reseñas verdaderas) y
+  con los productos de ejemplo del rubro cargados en Notion.
+- **El precio lo pone el servidor.** El carrito sólo dice qué y cuántos; si un
+  producto cambió o se agotó, pide recargar. Si el registro falla, el pedido
+  igual sale por WhatsApp.
+- **Aislamiento.** Todo endpoint del panel filtra por el usuario del token de
+  Clerk: un id ajeno responde 404. Todas las tiendas comparten dominio con el
+  panel, así que cada tienda sale con una política de contenido que sólo deja
+  correr el script del carrito (con nonce), y los enlaces que no son web,
+  correo o teléfono se descartan al armarla.
+- Hay direcciones reservadas (`panel`, `editor`, `api`, `precios`…) en
+  `api/_notion.js`.
+
+## Planes
+
+Los precios y límites viven en **un solo lugar**, `api/_planes.js`; la portada
+y el panel los leen de `GET /api/planes`.
+
+| Plan | Precio | Límites |
+|---|---|---|
+| Gratis | Gs. 0 | 20 productos, 3 categorías, 1 tienda, con el botón «Creá tu tienda gratis» |
+| Negocio | Gs. 79.000/mes | Productos y categorías ilimitados, 1 tienda, sin la marca |
+| Pro | Gs. 149.000/mes | Todo ilimitado, hasta 3 tiendas, sin la marca |
+
+- Los límites se aplican en el servidor (`api/productos.js`, `api/tiendas.js`
+  y al guardar desde el editor). Ocultar un producto no libera lugar.
+- **Si un plan vence**, la tienda sigue en línea con los límites del Gratis:
+  los productos que pasan el límite dejan de mostrarse, pero no se borran, y se
+  puede seguir guardando lo que ya había.
+- El plan de cada usuario vive en la **metadata pública de Clerk** (`plan`,
+  `planHasta`), que sólo escribe el servidor. Se **recalcula desde cero** a
+  partir de los pagos acreditados de la base Pagos, así que un aviso repetido
+  nunca cuenta un pago dos veces. Pagar el mismo plan lo extiende; pagar otro
+  lo reemplaza desde ese día.
+- **Cortesías:** `{"planFijo": "pro"}` en la metadata pública de un usuario
+  (panel de Clerk → *Users* → *Metadata*) le da ese plan sin vencimiento.
+  Conviene ponérselo a tu propia cuenta.
+
+### Cobro con Pagopar
+
+```
+panel ──POST /api/planes──► fila Pendiente en Pagos ──► Pagopar: iniciar-transaccion
+      ◄── checkout de Pagopar (pagopar.com/pagos/<hash>)
+Pagopar ──POST /api/pagopar (aviso firmado)──┐
+comprador ──vuelve a /panel?pago=<hash>──────┴──► confirmarPago(): le vuelve a preguntar
+                                                   el estado a Pagopar y recalcula el plan
+```
+
+No hay débito automático: el cliente elige 1, 3 o 12 meses y paga una vez.
+Para activarlo:
+
+1. En el panel de comercio de Pagopar, copiá la **clave pública** y la **privada**.
+2. Configurá ahí la **URL de respuesta**: `https://<tu-dominio>/api/pagopar`,
+   y la **URL de redirección**: `https://<tu-dominio>/panel?pago=($hash)`.
+3. Cargá las claves en Vercel (no las pegues en un chat):
+   ```bash
+   vercel env add PAGOPAR_PUBLIC_KEY production
+   vercel env add PAGOPAR_PRIVATE_KEY production
+   ```
+
+Sin esas claves el panel muestra los planes pero con el pago deshabilitado.
+
+## Fotos en Cloudflare R2
+
+El panel y el editor achican cada foto en el navegador (WebP, 1920 px como
+máximo) y la suben **directo** al bucket con una URL firmada por
+`api/imagenes.js`: vale 5 minutos, para un solo archivo con ese tipo y ese
+tamaño, dentro de `u/<id de Clerk>/`. Pide sesión iniciada. No se aceptan SVG
+(pueden llevar scripts).
+
+Para activarlo, en Cloudflare:
+
+1. Un **token de API de R2** con permiso de *Object Read & Write* sobre el
+   bucket `tiendita`.
+2. La **regla CORS** del bucket, para que el navegador pueda subir:
+   ```json
+   [{ "AllowedOrigins": ["https://<tu-dominio>", "http://localhost:3000"],
+      "AllowedMethods": ["PUT"], "AllowedHeaders": ["content-type"], "MaxAgeSeconds": 3600 }]
+   ```
+3. Las variables en Vercel:
+   ```bash
+   vercel env add R2_ACCOUNT_ID production      # f9d775fecdc16425d4e6f98d8c3b7555
+   vercel env add R2_BUCKET production          # tiendita
+   vercel env add R2_PUBLIC_BASE production     # https://pub-3a0ab81b24b7485b917cf49de2d1576f.r2.dev
+   vercel env add R2_ACCESS_KEY_ID production
+   vercel env add R2_SECRET_ACCESS_KEY production
+   ```
+
+Sin R2 el panel deja pegar el enlace de una imagen, y el Taller sigue
+guardando las fotos de las demos en el navegador como antes.
+
+## Variables de entorno
+
+| Variable | Para qué |
+|---|---|
+| `CLERK_SECRET_KEY`, `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` | Cuentas (las carga la integración de Clerk) |
+| `NOTION_TOKEN`, `NOTION_DB_PROYECTOS`, `NOTION_DB_PRODUCTOS` | Tiendas y productos |
+| `NOTION_DB_PEDIDOS`, `NOTION_DB_PAGOS` | Pedidos y pagos de planes. Las crea `node --env-file=.env.local tools/preparar-notion.mjs` |
+| `R2_*` | Fotos (ver arriba) |
+| `PAGOPAR_PUBLIC_KEY`, `PAGOPAR_PRIVATE_KEY` | Cobro de planes (ver arriba) |
+| `VERCEL_TOKEN`, `VERCEL_TEAM_ID` | Sólo para «Publicar demo» del Taller |
+
+---
+
 # Taller de Páginas
 
-Editor de plantillas para armar páginas web por rubro. Elegís la categoría de tu
-negocio, editás todo directamente sobre la página y la publicás o descargás como un
-archivo `index.html` autónomo listo para subir a cualquier hosting.
+El editor de plantillas que usan las tiendas. Abierto en `/editor` sin
+`?tienda=`, sigue siendo la herramienta para armar demos por rubro, editarlas
+sobre la página y publicarlas o descargarlas como un `index.html` autónomo.
 
 El contenido de arranque está pensado para negocios paraguayos: precios en
 guaraníes, enlaces de WhatsApp armados solos, horarios partidos por la siesta,
@@ -103,19 +238,37 @@ adentro, sin JavaScript y sin más pedido externo que Google Fonts.
 ## Estructura
 
 ```
-index.html          Cáscara de la aplicación y marcado del editor
-css/taller.css      Estilos del editor (claro y oscuro)
+index.html          Portada pública
+panel.html          Panel de clientes
+editor.html         El editor (Taller de Páginas)
+css/sitio.css       Estilos de la portada y piezas comunes (claro y oscuro)
+css/panel.css       Estilos del panel
+css/taller.css      Estilos del editor
 js/motor.js         Utilidades, tipografías, paletas, fondos generados, CSS de las páginas
-js/secciones.js     Secciones reutilizables, sus campos y el armado del documento final
+js/secciones.js     Secciones reutilizables, el carrito y el armado del documento final
 js/rubros.js        Los 15 rubros con su contenido de arranque
+js/sitio.js         Portada: miniaturas reales de plantillas y precios
+js/panel.js         Panel: alta, inicio, productos, pedidos, ajustes y plan
 js/cuenta.js        Ingreso con Clerk y pedidos a la API
-js/app.js           Panel, edición directa, zoom, imágenes, guardado, exportación y publicación
-api/proyectos.js    Proyectos y productos de cada usuario, en Notion
-api/config.js       Clave publicable de Clerk para el editor
+js/fotos.js         Achicar fotos y subirlas a R2 (panel y editor)
+js/app.js           Editor: edición directa, zoom, imágenes, guardado, exportación y demos
+api/tienda.js       Sirve cada tienda publicada en /<dirección>
+api/tiendas.js      Alta y ajustes de las tiendas de cada usuario
+api/productos.js    Productos de una tienda, de a uno, con los límites del plan
+api/pedidos.js      Alta pública de pedidos; lista y estados para el dueño
+api/planes.js       Planes, pago con Pagopar y confirmación a la vuelta
+api/pagopar.js      Aviso de Pagopar cuando cambia un pago
+api/imagenes.js     Firma la subida de una foto a R2
+api/proyectos.js    Diseño y productos desde el editor, en Notion
+api/publicar.js     Publica una demo del Taller como proyecto propio en Vercel
+api/config.js       Clave publicable de Clerk
+api/_planes.js      Precios, límites y cálculo del plan de cada usuario
+api/_pagopar.js     Firmas, inicio y confirmación de pagos con Pagopar
+api/_render.js      El motor de plantillas cargado en el servidor
+api/_notion.js      Acceso a las bases de Notion y direcciones de tienda
 api/_sesion.js      Verifica la sesión de Clerk
-api/_notion.js      Acceso a las bases de Notion
-api/publicar.js     Publica una demo como proyecto propio en Vercel
 api/_comun.js       CORS y utilidades compartidas
+tools/preparar-notion.mjs  Crea las bases Pedidos y Pagos y las columnas nuevas
 tools/build-artifact.mjs   Arma el archivo único que consume el Artifact de Claude
 ```
 
@@ -128,7 +281,7 @@ node tools/build-artifact.mjs dist/taller-de-paginas.html
 
 ## Correrlo localmente
 
-El editor es estático. Para levantarlo solo, sin las funciones de la API:
+El editor y la portada son estáticos. Para verlos solos, sin las funciones de la API:
 
 ```bash
 python3 -m http.server 8777
@@ -139,7 +292,7 @@ entorno de Vercel, que carga las variables:
 
 ```bash
 vercel env pull        # trae las variables a .env.local
-vercel dev             # editor + API en http://localhost:3000
+vercel dev             # portada, panel, editor, tiendas y API en http://localhost:3000
 ```
 
 ## Cuentas y proyectos
@@ -244,6 +397,10 @@ cual y lo que está en `api/` se convierte en funciones. Cada push a `main`
 genera un deploy.
 
 ## Imágenes
+
+Con sesión iniciada y R2 configurado, las fotos van a R2 (ver *Fotos en
+Cloudflare R2*) y quedan con una dirección pública que sirve en cualquier
+compu. Sin R2, en el Taller se usa lo de siempre:
 
 Al tocar **Subir** (o arrastrar una foto sobre el campo), la imagen se achica en
 el navegador a 1920 px de lado como máximo, pasa a WebP y se guarda en el

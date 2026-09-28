@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Mi panel — Tiendita</title>
+<meta name="robots" content="noindex">
+<meta name="theme-color" content="#0E6F60">
+<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2032%2032%22%3E%3Crect%20width%3D%2232%22%20height%3D%2232%22%20rx%3D%227%22%20fill%3D%22%230E6F60%22%2F%3E%3Cpath%20d%3D%22M8%2012h16l-1.5%2012h-13z%22%20fill%3D%22%23fff%22%2F%3E%3Cpath%20d%3D%22M12%2012a4%204%200%200%201%208%200%22%20fill%3D%22none%22%20stroke%3D%22%23fff%22%20stroke-width%3D%222.4%22%2F%3E%3C%2Fsvg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Syne:wght@700;800&display=swap">
+<link rel="stylesheet" href="css/sitio.css">
+<link rel="stylesheet" href="css/panel.css">
+</head>
+<body class="panel">
+
+<!-- mientras carga la cuenta -->
+<div class="pantalla-centro" id="p-cargando">
+  <div class="girador" aria-hidden="true"></div>
+  <p>Cargando tu panel…</p>
+</div>
+
+<!-- sin sesión -->
+<div class="pantalla-centro" id="p-entrar" hidden>
+  <a class="logo-sitio" href="/"><span class="glyph" aria-hidden="true"></span>Tiendita</a>
+  <h1>Tu tienda, tus pedidos, en un solo lugar</h1>
+  <p>Entrá con tu cuenta, o creá una gratis para abrir tu tienda.</p>
+  <div class="fila-botones">
+    <button class="btn-s primario grande" type="button" data-registrarse>Crear mi cuenta gratis</button>
+    <button class="btn-s borde grande" type="button" data-ingresar>Ya tengo cuenta</button>
+  </div>
+  <p class="nota" id="nota-entrar"></p>
+</div>
+
+<!-- alta de la primera tienda -->
+<div class="alta" id="p-alta" hidden>
+  <header class="alta-cabeza">
+    <a class="logo-sitio" href="/"><span class="glyph" aria-hidden="true"></span>Tiendita</a>
+    <button class="btn-s fantasma chico" type="button" data-volver-panel hidden>← Volver al panel</button>
+    <div class="cuenta" data-cuenta></div>
+  </header>
+  <form class="alta-caja" id="form-alta" novalidate>
+    <ol class="alta-pasos" aria-label="Pasos"><li class="on">Tu tienda</li><li>Tu rubro</li><li>Tu WhatsApp</li></ol>
+
+    <fieldset class="alta-paso" data-paso="1">
+      <legend><h1>¿Cómo se llama tu tienda?</h1><p>Así la van a ver tus clientes. Lo podés cambiar cuando quieras.</p></legend>
+      <label class="campo"><span>Nombre de la tienda</span>
+        <input name="nombre" required maxlength="80" autocomplete="organization" placeholder="Casa Ñandutí"></label>
+      <label class="campo"><span>Dirección de tu tienda</span>
+        <div class="slug"><span class="slug-base" data-base></span><input name="slug" required maxlength="40" autocapitalize="off" spellcheck="false" placeholder="casa-nanduti"></div>
+        <small class="pista" data-slug-estado>Sólo letras, números y guiones.</small></label>
+      <div class="alta-botones"><button class="btn-s primario grande" type="button" data-siguiente>Seguir</button></div>
+    </fieldset>
+
+    <fieldset class="alta-paso" data-paso="2" hidden>
+      <legend><h1>¿Qué vendés?</h1><p>Elegí el rubro y arrancás con una plantilla y productos de ejemplo. Todo se cambia después.</p></legend>
+      <div class="rubros" id="alta-rubros" role="radiogroup" aria-label="Rubro"></div>
+      <div class="alta-botones"><button class="btn-s fantasma" type="button" data-atras>Atrás</button><button class="btn-s primario grande" type="button" data-siguiente>Seguir</button></div>
+    </fieldset>
+
+    <fieldset class="alta-paso" data-paso="3" hidden>
+      <legend><h1>¿A qué WhatsApp llegan los pedidos?</h1><p>Cuando alguien compra, se abre un chat con este número con el pedido ya armado.</p></legend>
+      <label class="campo"><span>Número de WhatsApp</span>
+        <input name="whatsapp" type="tel" inputmode="tel" maxlength="20" autocomplete="tel" placeholder="0981 123 456"></label>
+      <p class="error" data-error hidden></p>
+      <div class="alta-botones"><button class="btn-s fantasma" type="button" data-atras>Atrás</button><button class="btn-s primario grande" type="submit">Crear mi tienda</button></div>
+    </fieldset>
+  </form>
+</div>
+
+<!-- el panel -->
+<div class="app" id="p-app" hidden>
+  <aside class="lateral">
+    <a class="logo-sitio" href="/"><span class="glyph" aria-hidden="true"></span>Tiendita</a>
+    <label class="selector-tienda" data-selector hidden><span class="oculto">Tienda</span><select id="sel-tienda"></select></label>
+    <nav class="menu" aria-label="Panel">
+      <button type="button" data-vista="inicio"><svg viewBox="0 0 24 24"><path d="M4 11l8-7 8 7v9h-5v-6H9v6H4z"/></svg>Inicio</button>
+      <button type="button" data-vista="productos"><svg viewBox="0 0 24 24"><path d="M5 8l7-4 7 4v8l-7 4-7-4z"/><path d="M5 8l7 4 7-4M12 12v8"/></svg>Productos</button>
+      <button type="button" data-vista="pedidos"><svg viewBox="0 0 24 24"><path d="M6 4h12v16l-3-2-3 2-3-2-3 2z"/><path d="M9 9h6M9 13h4"/></svg>Pedidos<b class="globo" data-nuevos hidden></b></button>
+      <button type="button" data-vista="tienda"><svg viewBox="0 0 24 24"><path d="M4 9l1.5-5h13L20 9"/><path d="M4 9h16v2a3 3 0 0 1-5.3 2A3 3 0 0 1 12 14a3 3 0 0 1-2.7-1A3 3 0 0 1 4 11z"/><path d="M5 14v6h14v-6"/></svg>Mi tienda</button>
+      <button type="button" data-vista="plan"><svg viewBox="0 0 24 24"><path d="M12 3l2.6 5.6 6 .7-4.5 4.1 1.2 6L12 16.4 6.7 19.4l1.2-6L3.4 9.3l6-.7z"/></svg>Plan</button>
+    </nav>
+    <a class="enlace-disenio" data-editor href="/editor"><svg viewBox="0 0 24 24"><path d="M4 20l4-1 11-11-3-3L5 16z"/><path d="M14 6l3 3"/></svg>Editar el diseño</a>
+    <div class="lateral-pie">
+      <a class="plan-chip" data-vista-enlace="plan" href="#plan"><span data-plan-nombre>Gratis</span><small data-plan-detalle></small></a>
+      <div class="cuenta" data-cuenta></div>
+    </div>
+  </aside>
+
+  <div class="principal">
+    <header class="barra-panel">
+      <div class="barra-titulo"><h1 id="titulo-vista">Inicio</h1><small id="sub-vista"></small></div>
+      <div class="barra-acciones">
+        <a class="btn-s borde chico" id="ver-tienda" target="_blank" rel="noopener">Ver mi tienda ↗</a>
+        <div class="cuenta solo-movil" data-cuenta></div>
+      </div>
+    </header>
+    <main class="vista" id="vista" tabindex="-1"></main>
+  </div>
+</div>
+
+<nav class="tabs-panel" id="tabs-panel" aria-label="Panel" hidden>
+  <button type="button" data-vista="inicio"><svg viewBox="0 0 24 24"><path d="M4 11l8-7 8 7v9h-5v-6H9v6H4z"/></svg>Inicio</button>
+  <button type="button" data-vista="productos"><svg viewBox="0 0 24 24"><path d="M5 8l7-4 7 4v8l-7 4-7-4z"/><path d="M5 8l7 4 7-4M12 12v8"/></svg>Productos</button>
+  <button type="button" data-vista="pedidos"><svg viewBox="0 0 24 24"><path d="M6 4h12v16l-3-2-3 2-3-2-3 2z"/><path d="M9 9h6M9 13h4"/></svg>Pedidos<b class="globo" data-nuevos hidden></b></button>
+  <button type="button" data-vista="tienda"><svg viewBox="0 0 24 24"><path d="M4 9l1.5-5h13L20 9"/><path d="M4 9h16v2a3 3 0 0 1-5.3 2A3 3 0 0 1 12 14a3 3 0 0 1-2.7-1A3 3 0 0 1 4 11z"/><path d="M5 14v6h14v-6"/></svg>Tienda</button>
+  <button type="button" data-vista="plan"><svg viewBox="0 0 24 24"><path d="M12 3l2.6 5.6 6 .7-4.5 4.1 1.2 6L12 16.4 6.7 19.4l1.2-6L3.4 9.3l6-.7z"/></svg>Plan</button>
+</nav>
+
+<div class="modal" id="modal" hidden>
+  <div class="modal-velo" data-cerrar-modal></div>
+  <div class="modal-caja" role="dialog" aria-modal="true" aria-labelledby="modal-titulo">
+    <div class="modal-cabeza"><b id="modal-titulo"></b><button class="btn-s fantasma chico" type="button" data-cerrar-modal aria-label="Cerrar">✕</button></div>
+    <div id="modal-contenido"></div>
+  </div>
+</div>
+
+<input type="file" id="archivo-foto" accept="image/png,image/jpeg,image/webp,image/avif,image/gif" hidden>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script src="js/motor.js"></script>
+<script src="js/secciones.js"></script>
+<script src="js/rubros.js"></script>
+<script src="js/sitio.js"></script>
+<script src="js/cuenta.js"></script>
+<script src="js/fotos.js"></script>
+<script src="js/panel.js"></script>
+</body>
+</html>
