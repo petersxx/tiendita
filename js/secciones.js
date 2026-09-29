@@ -439,7 +439,7 @@ const CAMPOS_ESTILO = [
 const ESTILO_POR_DEFECTO = {
   _escala:1, _radio:14, _aire:1,
   _moneda:'Gs.',
-  _apiBase:'https://tiendita-ebon-one.vercel.app',
+  _apiBase:'https://tiendita.maintechnologies.dev',
 };
 
 /* los campos que declara una sección */
